@@ -1,0 +1,16 @@
+{
+  "name": "eticaret-analizleri-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "E-Ticaret Analizleri — Supabase'ten veri çeken, webde yayınlanabilir statik pano",
+  "scripts": {
+    "build:web": "node scripts/build-web.js",
+    "import": "node scripts/import.js",
+    "dev": "node scripts/serve.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.4.5",
+    "xlsx": "^0.18.5"
+  }
+}

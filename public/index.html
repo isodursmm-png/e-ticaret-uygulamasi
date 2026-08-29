@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>E-Ticaret Analizleri</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+<style>
+/* ============ TEMA JETONLARI ============ */
+:root{
+  color-scheme: light;
+  --page:#eef1f6; --surface:#ffffff; --surface-2:#eef3fb;
+  --ink:#15180f; --ink-2:#585c4e; --muted:#8a8d80;
+  --hair:#e0e5ee; --hair-strong:#c7d0de;
+  --panel:#eef4fc; --panel-line:#d6e3f5; --panel-h:#5a6a80;
+  --brand-grad:linear-gradient(135deg,#6d28d9,#2563eb);
+  --accent:#2f7d3a; --accent-ink:#ffffff; --accent-wash:#e9f1e7;
+  --amber:#c9761f; --amber-wash:#f7ecde;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  --good:#0ca30c; --warn:#e0921a; --crit:#d03b3b;
+  --heat-0:#eef3fb; --heat-1:#184f95;
+  --shadow:0 1px 2px rgba(20,22,12,.05), 0 8px 24px -12px rgba(20,22,12,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --page:#0b0f16; --surface:#141a24; --surface-2:#1b2230;
+    --ink:#edf0e4; --ink-2:#b5b9a8; --muted:#8a8d80;
+    --hair:#242c3a; --hair-strong:#33404f;
+    --panel:#12223d; --panel-line:#294265; --panel-h:#94a9ca;
+    --accent:#5aa863; --accent-ink:#0e100a; --accent-wash:#1e2a1c;
+    --amber:#e0a044; --amber-wash:#2c2416;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --s5:#d55181; --s6:#22a022; --s7:#9085e9; --s8:#e66767;
+    --good:#12b312; --warn:#f0a83a; --crit:#e05656;
+    --heat-0:#141a24; --heat-1:#5fa0e6;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0b0f16; --surface:#141a24; --surface-2:#1b2230;
+  --ink:#edf0e4; --ink-2:#b5b9a8; --muted:#8a8d80;
+  --hair:#242c3a; --hair-strong:#33404f;
+  --panel:#12223d; --panel-line:#294265; --panel-h:#94a9ca;
+  --accent:#5aa863; --accent-ink:#0e100a; --accent-wash:#1e2a1c;
+  --amber:#e0a044; --amber-wash:#2c2416;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s5:#d55181; --s6:#22a022; --s7:#9085e9; --s8:#e66767;
+  --good:#12b312; --warn:#f0a83a; --crit:#e05656;
+  --heat-0:#141a24; --heat-1:#5fa0e6;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{background:var(--page); color:var(--ink)}
+body{font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:"Archivo","IBM Plex Sans",system-ui,sans-serif; text-wrap:balance; letter-spacing:-.01em}
+a{color:inherit}
+button{font:inherit; cursor:pointer}
+::selection{background:var(--accent); color:var(--accent-ink)}
+
+/* ============ İSKELET ============ */
+.app{display:grid; grid-template-columns:250px 1fr; min-height:100vh}
+
+.side{position:sticky; top:0; height:100vh; overflow-y:auto; background:var(--panel);
+  border-right:1px solid var(--panel-line); display:flex; flex-direction:column}
+.brand{padding:20px 20px 16px; border-bottom:1px solid var(--panel-line)}
+.brand .mark{display:flex; align-items:center; gap:10px}
+.brand .dot{width:26px; height:26px; border-radius:7px; background:var(--accent);
+  display:grid; place-items:center; color:var(--accent-ink); font-family:"Archivo"; font-weight:700; font-size:15px; flex:none}
+.brand h1{font-size:15px; font-weight:700; line-height:1.15}
+.brand p{font-size:11.5px; color:var(--muted); margin-top:3px; letter-spacing:.02em}
+.brand-src{display:flex; flex-wrap:nowrap; gap:4px; margin-top:10px}
+.src-pill{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:9px; font-weight:700; letter-spacing:0; padding:3px 7px; border-radius:999px;
+  color:#fff; background:var(--sc); box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.heat-note{display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; margin:2px 0 10px;
+  padding:8px 12px; border-radius:9px; background:var(--brand-grad); color:#fff;
+  font-size:11.5px; box-shadow:0 2px 10px rgba(0,0,0,.22)}
+.heat-note b{font-weight:800}
+.heat-note .hn-lbl{font-weight:800; text-transform:uppercase; letter-spacing:.06em; font-size:10px; opacity:.92}
+/* grafiği e-posta ile gönder */
+.pmail{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px; padding-top:11px; border-top:1px dashed var(--panel-line)}
+.pmail-ic{font-size:14px; line-height:1}
+.pmail-in{flex:1 1 190px; min-width:150px; max-width:280px; padding:6px 10px; font:inherit; font-size:12px;
+  border:1px solid var(--hair-strong); border-radius:8px; background:var(--surface-2); color:var(--ink)}
+.pmail-btn{border:0; border-radius:8px; padding:7px 14px; font:inherit; font-size:12px; font-weight:700;
+  color:#fff; background:var(--brand-grad); cursor:pointer; box-shadow:0 1px 6px rgba(0,0,0,.22); white-space:nowrap}
+.pmail-btn:hover{filter:brightness(1.08)}
+.pmail-btn:disabled{opacity:.55; cursor:default}
+.pmail-msg{font-size:11.5px; color:var(--ink-2)}
+.pmail-msg.ok{color:var(--good); font-weight:700}
+.pmail-msg.err{color:var(--warn)}
+
+.nav{padding:12px 10px; flex:1}
+.nav .grp{display:flex; align-items:center; gap:8px; margin:16px 8px 8px; font-size:10px; font-weight:700;
+  letter-spacing:.15em; text-transform:uppercase; color:var(--gc,var(--muted))}
+.nav .grp::before{content:""; width:16px; height:3px; border-radius:2px; background:var(--gc,var(--muted)); flex:none}
+.nav a.navobj{display:flex; align-items:center; gap:10px; padding:8px 10px; margin:4px 3px;
+  border:1px solid var(--panel-line); border-left:3px solid color-mix(in srgb,var(--gc) 50%,transparent);
+  border-radius:10px; background:color-mix(in srgb,var(--panel) 62%, var(--page)); color:var(--ink-2); text-decoration:none;
+  font-size:12.5px; font-weight:500; line-height:1.25;
+  transition:transform .08s ease, border-color .12s, background .12s}
+.nav a.navobj .ic{width:23px; height:23px; flex:none; display:grid; place-items:center; border-radius:7px;
+  font-size:12px; background:color-mix(in srgb,var(--gc) 16%,var(--surface)); color:var(--gc)}
+.nav a.navobj:hover{border-color:var(--gc); border-left-color:var(--gc); transform:translateX(2px); color:var(--ink)}
+.nav a.navobj.on{background:color-mix(in srgb,var(--gc) 14%,var(--surface));
+  border-color:color-mix(in srgb,var(--gc) 45%,transparent); border-left:3px solid var(--gc);
+  color:var(--ink); font-weight:600}
+.nav a.navobj.on .ic{background:var(--gc); color:var(--surface)}
+.side .foot{padding:14px 18px; border-top:1px solid var(--panel-line); font-size:11px; color:var(--muted)}
+.side .foot b{color:var(--ink-2); font-weight:600}
+
+/* ============ ANA ALAN ============ */
+.main{min-width:0; display:flex; flex-direction:column}
+.topbar{position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--page) 88%, transparent);
+  backdrop-filter:blur(8px); border-bottom:1px solid var(--hair); padding:14px 26px}
+.topbar .row1{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+.topbar h2{font-size:18px; font-weight:700; flex:1; min-width:180px}
+.tb-btn{border:1px solid var(--hair-strong); background:var(--surface); color:var(--ink-2);
+  padding:7px 12px; border-radius:8px; font-size:12.5px; font-weight:500; display:inline-flex; gap:6px; align-items:center}
+.tb-btn:hover{border-color:var(--accent); color:var(--accent)}
+.tb-btn.act{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+
+/* ---- dönem hızlı seçimi (tüm sayfalarda) ---- */
+.daterange{display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px}
+.daterange .drlbl{font-size:7px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-right:2px}
+.dr-btn{display:inline-flex; align-items:center; gap:4px; border:0; border-radius:999px;
+  padding:5px 10px; font:inherit; font-size:9px; font-weight:700; color:#fff; cursor:pointer;
+  box-shadow:0 1px 6px rgba(0,0,0,.22); transition:transform .08s ease, filter .15s ease}
+.dr-btn:hover{filter:brightness(1.1); transform:translateY(-1px)}
+.dr-btn.on{outline:2px solid var(--ink); outline-offset:1px; filter:brightness(1.06)}
+.dr-ay{background:linear-gradient(135deg,#6366f1,#8b5cf6)}
+.dr-hf{background:linear-gradient(135deg,#0ea5e9,#22d3ee)}
+.dr-ta{background:linear-gradient(135deg,#f59e0b,#f97316)}
+.dr-all{background:linear-gradient(135deg,#10b981,#059669)}
+.dr-inputs{display:none; gap:4px; align-items:center; color:var(--ink-2); font-size:8.5px}
+.dr-inputs.open{display:inline-flex}
+.dr-inputs input{padding:4px 6px; border:1px solid var(--hair-strong); border-radius:6px;
+  background:var(--surface-2); color:var(--ink); font:inherit; font-size:8.5px}
+.chips{display:flex; gap:4px; flex-wrap:wrap; margin-top:7px}
+.chip{font-size:8px; padding:3px 6px; border-radius:999px; background:var(--surface-2);
+  border:1px solid var(--hair); color:var(--ink-2); display:inline-flex; gap:5px; align-items:center}
+.chip b{font-weight:600; color:var(--ink)}
+.chip button{border:0; background:transparent; color:var(--muted); font-size:9px; line-height:1; padding:0}
+.chip button:hover{color:var(--crit)}
+
+.filters{display:none; margin-top:14px; padding:16px; background:var(--panel); border:1px solid var(--panel-line);
+  border-radius:12px; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px}
+.filters.open{display:grid}
+.fg label{display:block; font-size:10.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:6px}
+.fg select,.fg input{width:100%; padding:7px 9px; border:1px solid var(--hair-strong); border-radius:8px;
+  background:var(--surface-2); color:var(--ink); font:inherit; font-size:13px}
+.fg .multi{max-height:120px; overflow:auto; border:1px solid var(--hair-strong); border-radius:8px; padding:6px; background:var(--surface-2)}
+.fg .multi label{display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:500; text-transform:none;
+  letter-spacing:0; color:var(--ink-2); margin:0; padding:3px 2px; cursor:pointer}
+.fg .multi input{width:auto}
+
+.view{padding:22px 26px 60px; display:flex; flex-direction:column; gap:18px}
+.note{font-size:12px; color:var(--ink-2); background:var(--amber-wash); border:1px solid color-mix(in srgb,var(--amber) 30%,transparent);
+  padding:9px 13px; border-radius:9px}
+.note b{color:var(--ink)}
+
+.kpirow{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:9px}
+.kpi{background:var(--panel); border:1px solid var(--panel-line); border-radius:10px; padding:9px 11px; box-shadow:var(--shadow)}
+.kpi .k{font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--muted)}
+.kpi .v{font-family:"Archivo"; font-weight:700; font-size:17px; margin-top:3px; letter-spacing:-.02em}
+.kpi .s{font-size:10px; color:var(--ink-2); margin-top:2px}
+.kpi .s.up{color:var(--good)} .kpi .s.down{color:var(--crit)}
+.kpirow.compact{gap:7px}
+.kpirow.compact .kpi{padding:5px 10px; display:flex; align-items:baseline; gap:8px; box-shadow:none}
+.kpirow.compact .kpi .v{font-size:14px; margin-top:0}
+.kpirow.compact .kpi .k{font-size:9px}
+.kpirow.compact .kpi .s{display:none}
+
+.grid{display:grid; gap:16px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.span2{grid-column:span 2}
+@media(max-width:1180px){.g3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.g2,.g3{grid-template-columns:1fr} .span2{grid-column:auto}}
+
+.panel{background:var(--panel); border:1px solid var(--panel-line); border-radius:12px; padding:16px 17px; box-shadow:var(--shadow); min-width:0}
+.panel > h3{font-size:13px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ink);
+  margin-bottom:6px; padding-left:9px; border-left:3px solid var(--accent); line-height:1.3}
+.panel > .sub{font-size:11px; color:var(--ink-2); margin-bottom:10px; padding-left:12px}
+.chartwrap{width:100%; overflow-x:auto; margin-top:10px}
+.chartwrap svg{display:block; width:100%; height:auto; font-family:"IBM Plex Sans",sans-serif}
+.legend{display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; font-size:11px; color:var(--ink-2)}
+.legend i{width:11px; height:11px; border-radius:3px; display:inline-block; margin-right:6px; vertical-align:-1px}
+
+/* tablo */
+.tbl-scroll{overflow:auto; max-height:70vh; margin-top:6px}
+table.dt{border-collapse:collapse; width:100%; font-size:12.5px}
+table.dt th,table.dt td{padding:7px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--hair)}
+table.dt th:first-child,table.dt td:first-child{text-align:left; position:sticky; left:0; background:var(--panel)}
+table.dt thead th{position:sticky; top:0; z-index:3;
+  font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:#fff; font-weight:700;
+  background:var(--brand-grad); cursor:pointer; user-select:none; border-bottom:0;
+  box-shadow:inset 0 -1px 0 rgba(255,255,255,.18)}
+table.dt thead th:first-child{left:0; z-index:4; background:var(--brand-grad)}
+table.dt thead th:hover{color:#d7e4ff}
+table.dt tbody tr:hover td{background:var(--surface-2)}
+table.dt td.num{font-variant-numeric:tabular-nums}
+table.dt tfoot td{font-weight:700; border-top:2px solid var(--hair-strong); border-bottom:0; font-variant-numeric:tabular-nums}
+.pgr{display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:10px; font-size:12px; color:var(--ink-2)}
+.pgr button{border:1px solid var(--hair-strong); background:var(--surface); border-radius:7px; padding:4px 10px; color:var(--ink-2)}
+.pgr button:disabled{opacity:.4; cursor:default}
+
+.pivot-tools{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px}
+.pivot-tools .fg{min-width:150px}
+.quick{display:flex; gap:7px; flex-wrap:wrap; margin-bottom:12px}
+.quick button{border:1px solid var(--hair-strong); background:var(--surface-2); border-radius:999px; padding:5px 12px;
+  font-size:12px; font-weight:500; color:var(--ink-2)}
+.quick button:hover{border-color:var(--accent); color:var(--accent)}
+
+#tip{position:fixed; z-index:9999; pointer-events:none; background:var(--ink); color:var(--page);
+  padding:7px 10px; border-radius:7px; font-size:12px; line-height:1.45; box-shadow:0 6px 22px rgba(0,0,0,.28);
+  opacity:0; transition:opacity .1s; max-width:280px}
+#tip .sw{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:0}
+
+.bub{cursor:pointer}
+.miss{font-size:12px; color:var(--muted); text-align:center; padding:26px}
+
+@media(max-width:920px){
+  .app{grid-template-columns:1fr}
+  .side{position:static; height:auto; border-right:0; border-bottom:1px solid var(--hair)}
+  .nav{display:flex; flex-wrap:wrap; gap:6px; padding:10px}
+  .nav .grp{width:100%; margin:10px 6px 2px}
+  .nav a.navobj{margin:0; flex:1 1 auto; min-width:calc(50% - 6px)}
+  .topbar,.view{padding-left:16px; padding-right:16px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ============ TÜRKİYE HARİTASI (Leaflet — uydu / normal) ============ */
+.trmap{height:640px; border-radius:10px; overflow:hidden; background:var(--surface-2); border:1px solid var(--hair-strong)}
+.leaflet-container{font:inherit; background:var(--surface-2)}
+.trmap-normal{filter:none}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .trmap-normal{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.95) saturate(.7)}
+}
+:root[data-theme="dark"] .trmap-normal{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.95) saturate(.7)}
+/* kılavuz-çizgili harita etiketleri (üst üste binmez) */
+.trll{position:absolute; inset:0; pointer-events:none; z-index:640}
+.trll-svg{position:absolute; inset:0; overflow:visible}
+.trll-line{fill:none; stroke:#fff; stroke-width:1.8; opacity:.9; filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+.trll-dot{fill:#7cffb2; stroke:#0b0f16; stroke-width:1}
+.trll-lbl{display:inline-block; font:700 12px/1.2 "IBM Plex Sans",system-ui,sans-serif;
+  padding:4px 8px; background:rgba(9,13,22,.86); border:1px solid rgba(255,255,255,.2);
+  border-radius:7px; box-shadow:0 4px 14px rgba(0,0,0,.45); white-space:nowrap}
+.trll-lbl.l{float:right}
+.trll-lbl .n{display:block; color:#fff}
+.trll-lbl .c{display:block; color:#7cffb2}
+.trll-lbl .s{display:block; font-weight:600; font-size:10.5px; color:#ffce6b}
+.leaflet-control-layers{background:var(--surface); color:var(--ink-2);
+  border:1px solid var(--hair-strong); border-radius:9px; box-shadow:var(--shadow); padding:6px 8px}
+.leaflet-control-layers-list{font-size:12.5px; font-weight:600}
+.leaflet-control-layers label{margin:2px 0; display:flex; gap:6px; align-items:center}
+.leaflet-bar a,.leaflet-bar a:hover{background:var(--surface); color:var(--ink-2); border-color:var(--hair)}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--ink); color:var(--page)}
+.leaflet-popup-content{font:12.5px/1.5 inherit; margin:9px 12px}
+.leaflet-container a.leaflet-popup-close-button{color:var(--page)}
+
+/* ---- oturum kapısı ---- */
+#authGate{position:fixed; inset:0; z-index:99999; display:none; align-items:center; justify-content:center;
+  background:var(--page); padding:24px}
+#authGate.on{display:flex}
+#authGate .card{width:340px; max-width:100%; background:var(--panel); border:1px solid var(--panel-line);
+  border-radius:14px; padding:26px 24px; box-shadow:var(--shadow)}
+#authGate h2{font-size:17px; margin-bottom:4px}
+#authGate p{font-size:12px; color:var(--ink-2); margin-bottom:16px}
+#authGate label{display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); margin:10px 0 4px}
+#authGate input{width:100%; padding:9px 11px; font:inherit; font-size:13px; border:1px solid var(--hair-strong);
+  border-radius:9px; background:var(--surface-2); color:var(--ink)}
+#authGate button{width:100%; margin-top:16px; padding:10px; border:0; border-radius:9px; font:inherit;
+  font-weight:700; color:#fff; background:var(--brand-grad); cursor:pointer}
+#authGate button:disabled{opacity:.6; cursor:default}
+#authGate .msg{margin-top:12px; font-size:12px; min-height:16px}
+#authGate .msg.err{color:var(--warn)}
+#appShell{display:none}
+#appShell.ready{display:block}
+
+</style>
+</head>
+<body>
+<div id="appShell"><div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">
+        <div class="dot">T</div>
+        <div><h1>E‑Ticaret Analizleri</h1><p>Tahtakale Spot · çok kanallı satış panosu</p></div>
+      </div>
+      <div class="brand-src" id="brandSrc"></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="foot" id="foot"></div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="row1">
+        <h2 id="ttl">Genel Bakış</h2>
+        <button class="tb-btn" id="fltBtn">▤ Filtreler</button>
+        <button class="tb-btn" id="rstBtn">↺ Sıfırla</button>
+        <button class="tb-btn" id="thmBtn">◐ Tema</button>
+        <button class="tb-btn" id="fsBtn">⛶ Tam ekran</button>
+        <button class="tb-btn" id="logoutBtn" title="Oturumu kapat">⎋ Çıkış</button>
+      </div>
+      <div class="daterange" id="dr"></div>
+      <div class="chips" id="chips"></div>
+      <div class="filters" id="filters"></div>
+    </header>
+    <main class="view" id="view"></main>
+  </div>
+</div>
+</div><div id="tip"></div>
+
+
+<div id="authGate">
+  <form class="card" id="authForm">
+    <h2>E‑Ticaret Analizleri</h2>
+    <p>Devam etmek için giriş yapın.</p>
+    <label for="agEmail">E‑posta</label>
+    <input id="agEmail" type="email" autocomplete="email" required>
+    <label for="agPass">Parola</label>
+    <input id="agPass" type="password" autocomplete="current-password" required>
+    <button type="submit" id="agBtn">Giriş yap</button>
+    <div class="msg" id="agMsg"></div>
+  </form>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="./config.js"></script>
+<script type="module" src="./boot.js"></script>
+</body>
+</html>

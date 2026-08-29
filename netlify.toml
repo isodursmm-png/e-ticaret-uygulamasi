@@ -1,0 +1,11 @@
+# Netlify deploy ayarı — statik, sunucusuz.
+# Site ayarlarında ortam değişkenleri: SUPABASE_URL, SUPABASE_ANON_KEY
+
+[build]
+  command = "node scripts/gen-config.js"
+  publish = "public"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
