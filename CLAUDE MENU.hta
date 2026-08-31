@@ -1,0 +1,804 @@
+<HTA:APPLICATION
+  APPLICATIONNAME="CLAUDE MENU"
+  ICON="C:\Users\İshak DURMUŞ\Desktop\CLAUDE\claudemenu_icon.ico"
+  SCROLL="yes"
+  SINGLEINSTANCE="yes"
+  WINDOWSTATE="maximize"
+  BORDER="thin"
+/>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=11">
+<title>CLAUDE - Panosu</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Tahoma',Arial,sans-serif;background:#0a0e1a;color:#e2e8f0;font-size:14px;}
+
+.fixed-top{position:fixed;top:0;left:0;right:0;z-index:100;background:#0a0e1a;box-shadow:0 8px 22px rgba(0,0,0,.45);}
+
+.header{background:linear-gradient(120deg,#1a1040,#152451,#0d2b3e);border-bottom:2px solid #3b4a7a;padding:22px 32px;display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:justify;justify-content:space-between;-ms-flex-wrap:wrap;flex-wrap:wrap;gap:16px;}
+.header-left{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;gap:16px;}
+.logo{width:58px;height:58px;border-radius:14px;-ms-flex-negative:0;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,#7c3aed,#2563eb);display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:center;justify-content:center;box-shadow:0 0 0 3px rgba(124,58,237,.3);}
+.logo img{width:100%;height:100%;object-fit:cover;}
+.h-title{font-size:27px;font-weight:800;letter-spacing:.3px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+.h-title .h-t1{color:#ffffff;}
+.h-title .h-t2{color:#60a5fa;font-weight:400;margin:0 6px;}
+.h-title .h-t3{color:#93c5fd;}
+.h-sub{font-size:13px;color:#a7b4d4;margin-top:5px;font-weight:600;}
+.info-chips{display:-ms-flexbox;display:flex;gap:14px;-ms-flex-wrap:wrap;flex-wrap:wrap;}
+.chip{background:#1c2542;border:1px solid #3b4a7a;border-radius:10px;padding:8px 16px;font-size:13px;color:#d3dcf2;line-height:1.6;}
+.chip strong{color:#ffffff;display:block;font-size:13px;}
+.badge{padding:8px 18px;border-radius:20px;font-size:13px;font-weight:800;color:#34d399;border:1px solid #10b98166;background:#10b9811f;}
+
+.clock-badge-wrap{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;gap:14px;}
+.analog-clock{width:78px;height:78px;-ms-flex-negative:0;flex-shrink:0;}
+.clock-tz{font-size:9px;color:#93a3c4;text-align:center;text-transform:uppercase;letter-spacing:.4px;font-weight:800;margin-top:3px;}
+
+.fx-chip{background:linear-gradient(135deg,#0f2e20,#0a1f16);border:1px solid #10b98166;border-radius:10px;padding:7px 16px;box-shadow:0 0 0 1px #10b98122,0 3px 12px rgba(16,185,129,.18);}
+.fx-title-row{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:justify;justify-content:space-between;gap:10px;margin-bottom:4px;}
+.fx-title{font-size:9.5px;font-weight:800;color:#6ee7b7;text-transform:uppercase;letter-spacing:.6px;}
+.fx-date{color:#3f8f68;font-weight:600;text-transform:none;margin-left:4px;}
+.fx-refresh{font-size:9.5px;font-weight:800;color:#34d399;text-decoration:none;border:1px solid #10b98155;border-radius:5px;padding:2px 7px;-webkit-user-select:none;-ms-user-select:none;user-select:none;}
+.fx-refresh:hover{background:#10b9811f;color:#6ee7b7;}
+.fx-refresh.spinning{opacity:.6;}
+.fx-body{display:-ms-flexbox;display:flex;gap:16px;}
+.fx-loading{font-size:11px;color:#7fd9ae;}
+.fx-error{font-size:11px;color:#fca5a5;}
+.fx-cur-block{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;gap:8px;}
+.fx-cur-code{font-size:14px;font-weight:800;color:#ffffff;width:30px;-ms-flex-negative:0;flex-shrink:0;}
+.fx-cur-rates{font-size:10.5px;line-height:1.5;color:#d3f2e3;}
+.fx-cur-rates b{color:#34d399;font-weight:800;}
+.fx-lbl{color:#5fae86;font-weight:700;margin-right:3px;}
+
+.top-fixed{max-width:1800px;margin:0 auto;padding:16px 32px 14px 32px;}
+.main{padding:0 32px 24px;max-width:1800px;margin:0 auto;}
+
+.kpi-row{display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;gap:7px;margin-bottom:11px;}
+.kpi{border-radius:8px;padding:5px 9px;position:relative;overflow:hidden;width:calc(20% - 6px);-ms-flex:0 0 calc(20% - 6px);flex:0 0 calc(20% - 6px);border:1px solid;box-shadow:0 2px 6px rgba(0,0,0,.24);display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;gap:8px;}
+.kpi.c1{background:linear-gradient(160deg,#15274d,#0e1830);border-color:#3b82f680;}
+.kpi.c2{background:linear-gradient(160deg,#2c1d55,#180f2e);border-color:#8b5cf680;}
+.kpi.c3{background:linear-gradient(160deg,#0f3a2c,#0b201c);border-color:#10b98180;}
+.kpi.c4{background:linear-gradient(160deg,#40300e,#241a08);border-color:#f59e0b80;}
+.kpi.c5{background:linear-gradient(160deg,#421534,#22091c);border-color:#ec489980;}
+.kpi-val{font-size:15px;font-weight:800;color:#ffffff;line-height:1;-ms-flex-negative:0;flex-shrink:0;}
+.kpi-txt{-ms-flex:1;flex:1;min-width:0;text-align:center;}
+.kpi-lbl{font-size:8.5px;color:#b3bfdc;text-transform:uppercase;letter-spacing:.4px;font-weight:800;white-space:nowrap;}
+.kpi-sub{font-size:8.5px;color:#7885a8;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.search-wrap{margin-bottom:16px;}
+#searchInput{width:100%;padding:8px 14px;background:#161d33;border:1px solid #3b4a7a;border-radius:8px;color:#f8fafc;font-size:12.5px;outline:none;}
+#searchInput:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.22);}
+#resultCount{font-size:11px;color:#60a5fa;margin-top:5px;height:14px;font-weight:700;}
+
+.hero-card{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;gap:14px;margin:10px 0 0;padding:9px 20px;border-radius:10px;text-decoration:none;cursor:pointer;white-space:nowrap;overflow:hidden;background:linear-gradient(100deg,#4a3308,#5c3d0a 45%,#3a2806);border:1.5px solid #f59e0b;box-shadow:0 0 0 1px #f59e0b33,0 4px 16px rgba(245,158,11,.2);-webkit-transition:box-shadow .15s,-webkit-transform .15s;transition:box-shadow .15s,transform .15s;}
+.hero-card:hover{box-shadow:0 0 0 1px #f59e0b55,0 6px 20px rgba(245,158,11,.32);-webkit-transform:translateY(-1px);transform:translateY(-1px);}
+.hero-icon{font-size:18px;-ms-flex-negative:0;flex-shrink:0;width:34px;height:34px;border-radius:8px;background:#f59e0b26;border:1px solid #f59e0b55;display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:center;justify-content:center;}
+.hero-text{-ms-flex:1 1 auto;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hero-tag{font-size:10.5px;font-weight:800;color:#fcd34d;text-transform:uppercase;letter-spacing:.5px;margin-right:12px;padding:3px 9px;border:1px solid #f59e0b55;border-radius:5px;}
+.hero-title{font-size:14.5px;font-weight:800;color:#fff8ec;margin-right:8px;}
+.hero-file{font-size:11.5px;color:#e8c98a;font-weight:600;}
+.hero-arrow{font-size:18px;color:#fcd34d;-ms-flex-negative:0;flex-shrink:0;font-weight:800;}
+.hero-card.ik{background:linear-gradient(100deg,#2e1065,#4c1d95 45%,#1e0a47);border:1.5px solid #8b5cf6;box-shadow:0 0 0 1px #8b5cf633,0 4px 16px rgba(139,92,246,.2);}
+.hero-card.ik:hover{box-shadow:0 0 0 1px #8b5cf655,0 6px 20px rgba(139,92,246,.32);}
+.hero-card.ik .hero-icon{background:#8b5cf626;border:1px solid #8b5cf655;}
+.hero-card.ik .hero-tag{color:#c4b5fd;border:1px solid #8b5cf655;}
+.hero-card.ik .hero-title{color:#f5f3ff;}
+.hero-card.ik .hero-file{color:#ddd6fe;}
+.hero-card.ik .hero-arrow{color:#c4b5fd;}
+.hero-card.hero-dual{cursor:default;}
+.hero-dual-actions{display:flex;gap:8px;margin-left:auto;flex-shrink:0;}
+.hero-mini-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid #8b5cf655;border-radius:8px;background:#8b5cf61f;color:#f5f3ff;font-size:12.5px;font-weight:700;text-decoration:none;cursor:pointer;white-space:nowrap;}
+.hero-mini-btn:hover{background:#8b5cf63a;}
+.hero-mini-btn.alt{border:1px solid #fbbf2466;background:#fbbf241f;color:#fde68a;}
+.hero-mini-btn.alt:hover{background:#fbbf243a;}
+.hero-card.hero-dual{padding:5px 18px;margin-top:6px;}
+.hero-card.hero-dual .hero-icon{width:24px;height:24px;font-size:13px;border-radius:6px;}
+.hero-card.hero-dual .hero-title{font-size:13px;}
+.hero-card.hero-dual .hero-file{font-size:10.5px;}
+.hero-card.hero-dual .hero-tag{padding:2px 7px;margin-right:8px;}
+.hero-card.hero-dual .hero-mini-btn{padding:4px 12px;font-size:11.5px;}
+.hero-dual-logo{height:26px;width:48px;object-fit:contain;margin-right:14px;flex-shrink:0;border-radius:4px;background:#fff8ec;padding:2px 6px;}
+
+.hr-module{margin:14px 0 0;border-radius:12px;overflow:hidden;background:linear-gradient(160deg,#161233,#0f1830);border:1.5px solid #6d4aff55;box-shadow:0 0 0 1px #6d4aff22,0 6px 20px rgba(0,0,0,.35);}
+.hr-module-head{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;padding:14px 22px;background:linear-gradient(100deg,#2e1065,#1e2260 60%,#14204a);cursor:pointer;-webkit-user-select:none;-ms-user-select:none;user-select:none;}
+.hr-module.open .hr-module-head{border-bottom:1.5px solid #6d4aff55;}
+.hr-module-icon{font-size:19px;width:38px;height:38px;border-radius:10px;background:#8b5cf640;border:1px solid #8b5cf670;display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:center;justify-content:center;-ms-flex-negative:0;flex-shrink:0;margin-right:14px;}
+.hr-module-heading{-ms-flex:1;flex:1;min-width:0;}
+.hr-module-title{display:block;font-size:15.5px;font-weight:800;color:#ffffff;letter-spacing:.6px;text-transform:uppercase;line-height:1.3;}
+.hr-module-sub{display:block;font-size:11.5px;color:#c9bdf7;font-weight:600;letter-spacing:.15px;margin-top:3px;}
+.hr-module-count{-ms-flex-negative:0;flex-shrink:0;font-size:11.5px;color:#a78bfa;font-weight:700;background:#8b5cf61f;border:1px solid #8b5cf655;border-radius:20px;padding:4px 13px;margin-left:14px;}
+.hr-module-chevron{font-size:12px;color:#c4b5fd;font-weight:800;-ms-flex-negative:0;flex-shrink:0;width:18px;text-align:center;margin-left:12px;-webkit-transition:-webkit-transform .15s;transition:transform .15s;}
+.hr-module.open .hr-module-chevron{-webkit-transform:rotate(180deg);transform:rotate(180deg);}
+.hr-rows{display:none;}
+.hr-module.open .hr-rows{display:block;}
+.hr-row{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;padding:11px 22px;border-bottom:1px solid #24234a;background:#131028;text-decoration:none;cursor:default;-webkit-transition:background .12s;transition:background .12s;}
+.hr-row:last-child{border-bottom:none;}
+.hr-row:hover{background:#1b1740;}
+.hr-row.bordro{background:#1c1608;cursor:pointer;}
+.hr-row.bordro:hover{background:#241d0c;}
+.hr-row.grup{background:#141c3a;cursor:pointer;}
+.hr-row.grup:hover{background:#1a2550;}
+.hr-row-logo{height:24px;width:44px;object-fit:contain;-ms-flex-negative:0;flex-shrink:0;border-radius:4px;background:#fff8ec;padding:2px 5px;margin-right:14px;}
+.hr-row-icon{font-size:16px;width:30px;height:30px;border-radius:8px;display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:center;justify-content:center;-ms-flex-negative:0;flex-shrink:0;background:#8b5cf62e;border:1px solid #8b5cf64d;margin-right:14px;}
+.hr-row.bordro .hr-row-icon{background:#f59e0b2e;border:1px solid #f59e0b4d;}
+.hr-tag{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:3px 9px;border-radius:5px;-ms-flex-negative:0;flex-shrink:0;color:#c4b5fd;border:1px solid #8b5cf655;background:#8b5cf61a;margin-right:14px;}
+.hr-row.bordro .hr-tag{color:#fcd34d;border:1px solid #f59e0b55;background:#f59e0b1a;}
+.hr-row.grup .hr-tag{color:#93c5fd;border:1px solid #3b82f655;background:#3b82f61a;}
+.hr-row-text{-ms-flex:1;flex:1;min-width:0;}
+.hr-row-title{display:block;font-size:13.5px;font-weight:800;color:#f8fafc;}
+.hr-row-file{display:block;font-size:11px;color:#a7b4d4;font-weight:600;margin-top:2px;}
+.hr-row-actions{display:-ms-flexbox;display:flex;-ms-flex-negative:0;flex-shrink:0;margin-left:14px;}
+.hr-mini-btn{display:-ms-inline-flexbox;display:inline-flex;-ms-flex-align:center;align-items:center;padding:6px 14px;border:1px solid #8b5cf655;border-radius:7px;background:#8b5cf61f;color:#f5f3ff;font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;white-space:nowrap;margin-left:8px;}
+.hr-mini-btn:first-child{margin-left:0;}
+.hr-mini-btn:hover{background:#8b5cf63a;}
+.hr-mini-btn.alt{border:1px solid #fbbf2466;background:#fbbf241f;color:#fde68a;}
+.hr-mini-btn.alt:hover{background:#fbbf243a;}
+.hr-arrow{font-size:17px;color:#c4b5fd;font-weight:800;-ms-flex-negative:0;flex-shrink:0;margin-left:14px;}
+.hr-row.bordro .hr-arrow{color:#fcd34d;}
+.hr-row.grup .hr-arrow{color:#93c5fd;}
+
+.section{margin-bottom:32px;}
+.sec-header{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;gap:11px;margin-bottom:15px;padding-bottom:11px;border-bottom:2px solid #232d4d;}
+.sec-dot{width:13px;height:13px;border-radius:50%;-ms-flex-negative:0;flex-shrink:0;box-shadow:0 0 9px 1px currentColor;}
+.sec-title{font-size:16px;font-weight:800;color:#f8fafc;text-transform:uppercase;letter-spacing:.7px;}
+.sec-count{font-size:12.5px;color:#94a1c4;margin-left:auto;font-weight:700;}
+.sec-toggle{cursor:pointer;color:#a7b4d4;font-size:13px;margin-left:10px;-webkit-user-select:none;-ms-user-select:none;user-select:none;text-decoration:none;font-weight:700;}
+.sec-toggle:hover{color:#ffffff;}
+
+.card-grid{display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;margin:-4px;}
+.link-card{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;gap:9px;padding:9px 11px;background:#151c34;border:1px solid #2a3660;border-left-width:3px;border-left-style:solid;border-radius:8px;color:#e2e8f0;cursor:pointer;margin:4px;width:calc(20% - 8px);-ms-flex:0 0 calc(20% - 8px);flex:0 0 calc(20% - 8px);text-decoration:none;-webkit-transition:background .12s,-webkit-transform .12s;transition:background .12s,transform .12s;}
+.link-card:hover{background:#1d2a4d;-webkit-transform:translateY(-1px);transform:translateY(-1px);}
+.link-card.hidden{display:none;}
+.card-icon{font-size:16px;-ms-flex-negative:0;flex-shrink:0;width:30px;height:30px;border-radius:8px;display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:center;justify-content:center;}
+.card-title{font-size:12px;font-weight:700;line-height:1.3;color:#f8fafc;}
+.card-file{font-size:10px;color:#93a3c4;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;font-weight:600;}
+.link-card:hover .card-file{color:#93c5fd;}
+
+.link-card.featured{background:linear-gradient(135deg,#1c2b52,#161c34);border:1.5px solid #3b82f6;box-shadow:0 0 0 1px #3b82f640,0 4px 16px rgba(59,130,246,.35);}
+.link-card.featured:hover{box-shadow:0 0 0 1px #3b82f666,0 6px 22px rgba(59,130,246,.5);}
+.link-card.featured .card-icon{background:#3b82f64d;box-shadow:0 0 10px rgba(59,130,246,.5);}
+.featured-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:5px;font-size:8.5px;font-weight:800;letter-spacing:.4px;color:#0a0e1a;background:#60a5fa;vertical-align:1px;}
+.co-tag{display:inline-block;margin-right:6px;padding:1px 6px;border-radius:5px;font-size:9px;font-weight:800;letter-spacing:.3px;color:#0a0e1a;background:#93c5fd;vertical-align:1px;}
+
+.s1 .link-card{border-left-color:#3b82f6;} .s1 .sec-dot{background:#3b82f6;color:#3b82f6;} .s1 .card-icon{background:#3b82f633;} .s1 .sec-title{color:#93c5fd;}
+.s2 .link-card{border-left-color:#8b5cf6;} .s2 .sec-dot{background:#8b5cf6;color:#8b5cf6;} .s2 .card-icon{background:#8b5cf633;} .s2 .sec-title{color:#c4b5fd;}
+.s3 .link-card{border-left-color:#10b981;} .s3 .sec-dot{background:#10b981;color:#10b981;} .s3 .card-icon{background:#10b98133;} .s3 .sec-title{color:#6ee7b7;}
+.s4 .link-card{border-left-color:#f59e0b;} .s4 .sec-dot{background:#f59e0b;color:#f59e0b;} .s4 .card-icon{background:#f59e0b33;} .s4 .sec-title{color:#fcd34d;}
+.s5 .link-card{border-left-color:#ec4899;} .s5 .sec-dot{background:#ec4899;color:#ec4899;} .s5 .card-icon{background:#ec489933;} .s5 .sec-title{color:#f9a8d4;}
+.s6 .link-card{border-left-color:#06b6d4;} .s6 .sec-dot{background:#06b6d4;color:#06b6d4;} .s6 .card-icon{background:#06b6d433;} .s6 .sec-title{color:#67e8f9;}
+.s7 .link-card{border-left-color:#ef4444;} .s7 .sec-dot{background:#ef4444;color:#ef4444;} .s7 .card-icon{background:#ef444433;} .s7 .sec-title{color:#fca5a5;}
+.s8 .link-card{border-left-color:#84cc16;} .s8 .sec-dot{background:#84cc16;color:#84cc16;} .s8 .card-icon{background:#84cc1633;} .s8 .sec-title{color:#bef264;}
+.s9 .link-card{border-left-color:#64748b;} .s9 .sec-dot{background:#64748b;color:#64748b;} .s9 .card-icon{background:#64748b33;} .s9 .sec-title{color:#cbd5e1;}
+.s9.section-muted{opacity:.5;-webkit-transition:opacity .15s;transition:opacity .15s;}
+.s9.section-muted:hover{opacity:1;}
+.s9.section-muted .sec-title{font-size:13px;font-weight:700;}
+.s9.section-muted .sec-dot{width:9px;height:9px;box-shadow:none;}
+.s9.section-muted .link-card{padding:6px 9px;border-left-width:2px;}
+.s9.section-muted .card-icon{font-size:13px;width:24px;height:24px;}
+.s9.section-muted .card-title{font-size:11px;font-weight:600;}
+.s10 .link-card{border-left-color:#14b8a6;} .s10 .sec-dot{background:#14b8a6;color:#14b8a6;} .s10 .card-icon{background:#14b8a633;} .s10 .sec-title{color:#5eead4;}
+
+@media(max-width:1750px){.link-card{width:calc(25% - 8px);-ms-flex:0 0 calc(25% - 8px);flex:0 0 calc(25% - 8px);}}
+@media(max-width:1400px){.link-card{width:calc(33.333% - 8px);-ms-flex:0 0 calc(33.333% - 8px);flex:0 0 calc(33.333% - 8px);}.kpi{width:calc(33.333% - 12px);-ms-flex:0 0 calc(33.333% - 12px);flex:0 0 calc(33.333% - 12px);}}
+@media(max-width:1000px){.link-card{width:calc(50% - 8px);-ms-flex:0 0 calc(50% - 8px);flex:0 0 calc(50% - 8px);}}
+@media(max-width:820px){.link-card{width:calc(100% - 8px);-ms-flex:0 0 calc(100% - 8px);flex:0 0 calc(100% - 8px);}.kpi{width:calc(50% - 12px);-ms-flex:0 0 calc(50% - 12px);flex:0 0 calc(50% - 12px);}}
+
+.footer{text-align:center;color:#6b7aa3;font-size:12px;padding:24px;border-top:1px solid #202a48;margin-top:16px;font-weight:600;}
+</style>
+</head>
+<body>
+
+<div class="fixed-top" id="fixedTop">
+<div class="header">
+  <div class="header-left">
+    <div class="logo"><img src="CLAUDE\sc_grup_logo.png" alt="Logo"></div>
+    <div>
+      <div class="h-title"><span class="h-t1">CLAUDE</span><span class="h-t2">&mdash;</span><span class="h-t3">Panosu</span></div>
+    </div>
+  </div>
+  <div class="info-chips">
+    <div class="chip" style="display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;gap:10px;padding:6px 14px 6px 6px;">
+      <img src="CLAUDE\profil.png" style="width:36px;height:36px;border-radius:50%;object-fit:cover;object-position:top center;border:2px solid #4a5568;box-shadow:0 0 0 3px rgba(99,102,241,0.25);-ms-flex-negative:0;flex-shrink:0;" alt="İshak DURMUŞ">
+      <div><strong style="color:#e2e8f0;display:block;font-size:12px;font-weight:700;">İshak DURMUŞ</strong>Mali İşler Direktörü &middot; Secen Grup</div>
+    </div>
+    <div class="fx-chip" id="fxChip">
+      <div class="fx-title-row">
+        <div class="fx-title">DÖVİZ KURLARI <span class="fx-date" id="fxDate"></span></div>
+        <a href="#" class="fx-refresh" id="fxRefresh" onclick="loadFX();return false;" title="Kurları yenile">&#8635; Güncelle</a>
+      </div>
+      <div class="fx-body" id="fxBody">
+        <div class="fx-loading">TCMB kurları yükleniyor...</div>
+      </div>
+    </div>
+  </div>
+  <div class="clock-badge-wrap">
+    <div>
+      <svg class="analog-clock" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="48" fill="#0d1428" stroke="#5a6a99" stroke-width="2.5"/>
+        <line x1="50" y1="5" x2="50" y2="10" stroke="#93a3c4" stroke-width="1.5"/>
+        <line x1="50" y1="90" x2="50" y2="95" stroke="#93a3c4" stroke-width="1.5"/>
+        <line x1="5" y1="50" x2="10" y2="50" stroke="#93a3c4" stroke-width="1.5"/>
+        <line x1="90" y1="50" x2="95" y2="50" stroke="#93a3c4" stroke-width="1.5"/>
+        <text x="50" y="13" dy=".35em" text-anchor="middle" font-size="11" font-weight="800" fill="#e2e8f0">12</text>
+        <text x="68.5" y="17.96" dy=".35em" text-anchor="middle" font-size="10" font-weight="700" fill="#c3cee6">1</text>
+        <text x="82.04" y="31.5" dy=".35em" text-anchor="middle" font-size="10" font-weight="700" fill="#c3cee6">2</text>
+        <text x="87" y="50" dy=".35em" text-anchor="middle" font-size="11" font-weight="800" fill="#e2e8f0">3</text>
+        <text x="82.04" y="68.5" dy=".35em" text-anchor="middle" font-size="10" font-weight="700" fill="#c3cee6">4</text>
+        <text x="68.5" y="82.04" dy=".35em" text-anchor="middle" font-size="10" font-weight="700" fill="#c3cee6">5</text>
+        <text x="50" y="87" dy=".35em" text-anchor="middle" font-size="11" font-weight="800" fill="#e2e8f0">6</text>
+        <text x="31.5" y="82.04" dy=".35em" text-anchor="middle" font-size="10" font-weight="700" fill="#c3cee6">7</text>
+        <text x="17.96" y="68.5" dy=".35em" text-anchor="middle" font-size="10" font-weight="700" fill="#c3cee6">8</text>
+        <text x="13" y="50" dy=".35em" text-anchor="middle" font-size="11" font-weight="800" fill="#e2e8f0">9</text>
+        <text x="17.96" y="31.5" dy=".35em" text-anchor="middle" font-size="10" font-weight="700" fill="#c3cee6">10</text>
+        <text x="31.5" y="17.96" dy=".35em" text-anchor="middle" font-size="10" font-weight="700" fill="#c3cee6">11</text>
+        <line id="clockHour" x1="50" y1="50" x2="50" y2="32" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
+        <line id="clockMin" x1="50" y1="50" x2="50" y2="22" stroke="#93c5fd" stroke-width="2.5" stroke-linecap="round"/>
+        <line id="clockSec" x1="50" y1="50" x2="50" y2="17" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round"/>
+        <circle cx="50" cy="50" r="3" fill="#f59e0b"/>
+      </svg>
+      <div class="clock-tz">TR Saati</div>
+    </div>
+    <span class="badge" id="todayBadge">&nbsp;</span>
+  </div>
+</div>
+
+<div class="top-fixed">
+  <div class="kpi-row">
+    <div class="kpi c1"><div class="kpi-val">61</div><div class="kpi-txt"><div class="kpi-lbl">Toplam Dosya</div><div class="kpi-sub">Aktif rapor &amp; uygulama</div></div></div>
+    <div class="kpi c2"><div class="kpi-val">35</div><div class="kpi-txt"><div class="kpi-lbl">HTA Uygulama</div><div class="kpi-sub">Masaüstü rapor uygulaması</div></div></div>
+    <div class="kpi c3"><div class="kpi-val">21</div><div class="kpi-txt"><div class="kpi-lbl">HTML Rapor</div><div class="kpi-sub">Tarayıcı tabanlı rapor</div></div></div>
+    <div class="kpi c4"><div class="kpi-val">5</div><div class="kpi-txt"><div class="kpi-lbl">Sistem Aracı</div><div class="kpi-sub">Sunucu &amp; kurulum betiği</div></div></div>
+    <div class="kpi c5"><div class="kpi-val">10</div><div class="kpi-txt"><div class="kpi-lbl">Kategori</div><div class="kpi-sub">Grup şirket raporlama alanı</div></div></div>
+  </div>
+
+  <div class="search-wrap">
+    <input type="text" id="searchInput" placeholder="Dosya ara... (Ctrl+F) — örn: bilanço, izlenebilirlik, market, oto, carrefour" oninput="doSearch()">
+    <div id="resultCount"></div>
+  </div>
+
+  <!-- ÖZEL MENÜ — POWER BI -->
+  <a class="hero-card" onclick="openFile('2026_2025_OZEL_RAPORLAR_DASHBOARD.hta');return false;" href="#">
+    <div class="hero-icon">📚</div>
+    <div class="hero-text">
+      <span class="hero-tag">AYRI UYGULAMA</span>
+      <span class="hero-title">2026 / 2025 Özel Raporlar Menüsü</span>
+      <span class="hero-file">&mdash; 2026_2025_OZEL_RAPORLAR_DASHBOARD.hta &bull; Desktop\POWER BI klasöründeki 122 rapora açılır &bull; Veriler canlı (güncel) veridir</span>
+    </div>
+    <div class="hero-arrow">&#8594;</div>
+  </a>
+
+  <div class="hr-module" id="hrModule">
+    <div class="hr-module-head" onclick="toggleHrModule();return false;">
+      <div class="hr-module-icon">🧑‍💼</div>
+      <div class="hr-module-heading">
+        <span class="hr-module-title">İnsan Kaynakları Modülü</span>
+        <span class="hr-module-sub">Bordro &amp; Personel Yönetim Sistemleri</span>
+      </div>
+      <div class="hr-module-count">1 sistem</div>
+      <div class="hr-module-chevron" id="hrChevron">&#9660;</div>
+    </div>
+    <div class="hr-rows" id="hrRows">
+      <div class="hr-row bordro" onclick="openDesktopApp('BORDRO-YONETIM-SISTEMI\\BASLAT.bat');return false;">
+        <div class="hr-row-icon">💰</div>
+        <span class="hr-tag">Ayrı Uygulama</span>
+        <div class="hr-row-text"><span class="hr-row-title">Bordro Yönetim Sistemi</span><span class="hr-row-file">Desktop\BORDRO-YONETIM-SISTEMI &bull; localhost:5175 &bull; Secenart / Prenses / Secengida / Tahtakalespot / Usre &mdash; izin formu (saatlik izin dahil) + personel özlük + CSV içe/dışa aktarma hepsi bu uygulamanın içinde &bull; kapatmak için konsolu kapatın</span></div>
+        <div class="hr-row-actions">
+          <a class="hr-mini-btn" onclick="openExternalUrl('http://localhost:5175/izin-formu.html');return false;" href="#">🗓️ İzin Formu</a>
+          <a class="hr-mini-btn alt" onclick="openExternalUrl('http://localhost:5175/');return false;" href="#">🗂️ Personel Özlük</a>
+        </div>
+        <div class="hr-arrow">&#8594;</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="main" id="mainContent">
+
+  <!-- SECTION 1 -->
+  <div class="section s1" id="sec-1">
+    <div class="sec-header">
+      <div class="sec-dot"></div><div class="sec-title">Grup Finansal Raporlar</div>
+      <div class="sec-count">22 dosya</div><a class="sec-toggle" onclick="toggleSec('sec-1');return false;" href="#">[daralt]</a>
+    </div>
+    <div class="card-grid sec-body">
+      <a class="link-card" onclick="openAbcAnalizi();return false;" href="#" style="background:linear-gradient(135deg,#1a3a6b,#0f2547);border:1.5px solid #b06000;box-shadow:0 0 0 1px #b0600040,0 4px 16px rgba(176,96,0,.3);"><div class="card-icon" style="background:#1a66cc4d;box-shadow:0 0 10px rgba(26,102,204,.5);">🎯</div><div><div class="card-title">Grup Şirket ABC Analizi <span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:5px;font-size:8.5px;font-weight:800;letter-spacing:.4px;color:#fff;background:#b06000;vertical-align:1px;">CANLI · AY BAZLI YENİLE</span></div><div class="card-file">GRUP ŞİRKET ABC ANALİZİ.html</div></div></a>
+      <a class="link-card featured" onclick="openFile('GRUP FİRMA FİNANSAL YAPI.hta');return false;" href="#"><div class="card-icon">🏛️</div><div><div class="card-title">Grup Firma Finansal Yapı <span class="featured-badge">ANA REFERANS · CANLI</span></div><div class="card-file">GRUP FİRMA FİNANSAL YAPI.hta</div></div></a>
+      <a class="link-card" onclick="openFile('SECENGIDA AKBANK HAZİRAN 2026 - CARİ HAREKETLERİ RAPORU.html');return false;" href="#"><div class="card-icon">🧾</div><div><div class="card-title"><span class="co-tag">SECENGIDA</span>Akbank Hesap Hareketleri</div><div class="card-file">SECENGIDA AKBANK HAZİRAN 2026 - CARİ HAREKETLERİ RAPORU.html</div></div></a>
+      <a class="link-card" onclick="openFile('DENİZBANK OCAK-HAZİRAN 2026 - HESAP HAREKETLERİ RAPORU.html');return false;" href="#"><div class="card-icon">🧾</div><div><div class="card-title"><span class="co-tag">SECENART</span>Denizbank Ocak-Haziran 2026 Hesap Hareketleri</div><div class="card-file">DENİZBANK OCAK-HAZİRAN 2026 - HESAP HAREKETLERİ RAPORU.html</div></div></a>
+      <a class="link-card" onclick="openFile('PRENSES AKBANK OCAK-TEMMUZ 2026 - CARİ HAREKETLERİ RAPORU.html');return false;" href="#"><div class="card-icon">🧾</div><div><div class="card-title"><span class="co-tag">PRENSES</span>Akbank Ocak-Temmuz 2026 Hesap Hareketleri</div><div class="card-file">PRENSES AKBANK OCAK-TEMMUZ 2026 - CARİ HAREKETLERİ RAPORU.html</div></div></a>
+      <a class="link-card featured" onclick="openFile('REEL_GRUP_KAR_ZARAR.hta');return false;" href="#"><div class="card-icon">💹</div><div><div class="card-title">REEL Grup Kar Zarar <span class="featured-badge">FİRMA SEKME + 2025→2026 MUKAYESE</span></div><div class="card-file">REEL_GRUP_KAR_ZARAR.hta</div></div></a>
+      <a class="link-card" onclick="openFile('GRUP BİLANÇOLARI.hta');return false;" href="#"><div class="card-icon">🏛️</div><div><div class="card-title">Grup Bilançoları</div><div class="card-file">GRUP BİLANÇOLARI.hta</div></div></a>
+      <a class="link-card" onclick="openFile('2026 Yılı Bilanço ve Rasyolar.hta');return false;" href="#"><div class="card-icon">📋</div><div><div class="card-title">2026 Yılı Bilanço ve Rasyolar</div><div class="card-file">2026 Yılı Bilanço ve Rasyolar.hta</div></div></a>
+      <a class="link-card featured" onclick="openFile('GRUP_GELIR_TABLOSU.hta');return false;" href="#"><div class="card-icon">📈</div><div><div class="card-title">Grup Gelir Tablosu <span class="featured-badge">CANLI</span></div><div class="card-file">GRUP_GELIR_TABLOSU.hta</div></div></a>
+      <a class="link-card" onclick="openFile('GRUP NAT TABLOSU.hta');return false;" href="#"><div class="card-icon">💧</div><div><div class="card-title">Grup Firmalar NAT Tablosu</div><div class="card-file">GRUP NAT TABLOSU.hta &bull; Canlı</div></div></a>
+      <a class="link-card" onclick="openFile('2026_SCGRUP_KAR_ZARAR.hta');return false;" href="#"><div class="card-icon">💹</div><div><div class="card-title">2026 SC Grup Kâr / Zarar</div><div class="card-file">2026_SCGRUP_KAR_ZARAR.hta</div></div></a>
+      <a class="link-card" onclick="openFile('2026_SECENART_KAR_ZARAR.hta');return false;" href="#"><div class="card-icon">💹</div><div><div class="card-title">2026 Secenart Kâr / Zarar</div><div class="card-file">2026_SECENART_KAR_ZARAR.hta</div></div></a>
+      <a class="link-card" onclick="openFile('2026_PRENSES_KAR_ZARAR.hta');return false;" href="#"><div class="card-icon">💹</div><div><div class="card-title">2026 Prenses Kâr / Zarar</div><div class="card-file">2026_PRENSES_KAR_ZARAR.hta</div></div></a>
+      <a class="link-card" onclick="openFile('USRE_RESTORAN_2026_KarZarar.html');return false;" href="#"><div class="card-icon">💹</div><div><div class="card-title">Usre Restoran 2026 Kâr / Zarar</div><div class="card-file">USRE_RESTORAN_2026_KarZarar.html</div></div></a>
+      <a class="link-card featured" onclick="openBirikimKarZarar();return false;" href="#"><div class="card-icon">💹</div><div><div class="card-title">Grup Usre Kar Zarar <span class="featured-badge">CANLI · PROJE MATRİSİ 10/20/30</span></div><div class="card-file">GRUP_USRE_KAR_ZARAR.html</div></div></a>
+      <a class="link-card featured" onclick="openFile('CARİ_DETAY_RAPOR.hta');return false;" href="#"><div class="card-icon">🧾</div><div><div class="card-title">Cari Detay Rapor <span class="featured-badge">SIK KULLANILAN</span></div><div class="card-file">CARİ_DETAY_RAPOR.hta</div></div></a>
+      <a class="link-card featured" onclick="openFile('GRUP FİNANSMAN HAREKETLERİ.hta');return false;" href="#"><div class="card-icon">🏦</div><div><div class="card-title">Grup Finansman Hareketleri <span class="featured-badge">CANLI · IBAN &amp; HAVALE/ÇEK</span></div><div class="card-file">GRUP FİNANSMAN HAREKETLERİ.hta</div></div></a>
+      <a class="link-card" onclick="openFile('MIZAN.hta');return false;" href="#"><div class="card-icon">🧾</div><div><div class="card-title">Mizan</div><div class="card-file">MIZAN.hta</div></div></a>
+      <a class="link-card" onclick="openFile('KREDİ HESAPLAMA.html');return false;" href="#"><div class="card-icon">💳</div><div><div class="card-title">Kredi Hesaplama</div><div class="card-file">KREDİ HESAPLAMA.html</div></div></a>
+      <a class="link-card" onclick="openGrupUrunMaliyetleri();return false;" href="#" style="background:linear-gradient(135deg,#1a3a6b,#0f2547);border:1.5px solid #b06000;box-shadow:0 0 0 1px #b0600040,0 4px 16px rgba(176,96,0,.3);"><div class="card-icon" style="background:#1a66cc4d;box-shadow:0 0 10px rgba(26,102,204,.5);">🧪</div><div><div class="card-title">Grup Ürün Maliyetleri <span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:5px;font-size:8.5px;font-weight:800;letter-spacing:.4px;color:#fff;background:#b06000;vertical-align:1px;">CANLI · FİRMA BAZLI YENİLE</span></div><div class="card-file">GRUP ÜRÜN MALİYETLERİ.html</div></div></a>
+    </div>
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="section s2" id="sec-2">
+    <div class="sec-header">
+      <div class="sec-dot"></div><div class="sec-title">Bütçe &amp; Plan-Gerçekleşen</div>
+      <div class="sec-count">5 dosya</div><a class="sec-toggle" onclick="toggleSec('sec-2');return false;" href="#">[daralt]</a>
+    </div>
+    <div class="card-grid sec-body">
+      <a class="link-card" onclick="openFile('ID_26_SECEN_GERCEK_PLAN.hta');return false;" href="#"><div class="card-icon">🎯</div><div><div class="card-title">Secengida Gerçek / Plan</div><div class="card-file">ID_26_SECEN_GERCEK_PLAN.hta</div></div></a>
+      <a class="link-card" onclick="openFile('ID_26_SECENART_GERCEK_PLAN.hta');return false;" href="#"><div class="card-icon">🎯</div><div><div class="card-title">Secenart Gerçek / Plan</div><div class="card-file">ID_26_SECENART_GERCEK_PLAN.hta</div></div></a>
+      <a class="link-card" onclick="openFile('ID_26_PRENSES_GERCEK_PLAN.hta');return false;" href="#"><div class="card-icon">🎯</div><div><div class="card-title">Prenses Gerçek / Plan</div><div class="card-file">ID_26_PRENSES_GERCEK_PLAN.hta</div></div></a>
+      <a class="link-card" onclick="openFile('ID_2026_USRE_GERCEK_PLAN.hta');return false;" href="#"><div class="card-icon">🎯</div><div><div class="card-title">Usre Gerçek / Plan</div><div class="card-file">ID_2026_USRE_GERCEK_PLAN.hta</div></div></a>
+      <a class="link-card" onclick="openFile('2027 Yılı Grup Bütçeleri.hta');return false;" href="#" style="background:linear-gradient(135deg,#3a1010,#241010);border:1.5px solid #ef4444;box-shadow:0 0 0 1px #ef444440,0 4px 16px rgba(239,68,68,.3);"><div class="card-icon" style="background:#ef44444d;box-shadow:0 0 10px rgba(239,68,68,.5);">⚠️</div><div><div class="card-title">2027 Yılı Grup Bütçeleri <span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:5px;font-size:8.5px;font-weight:800;letter-spacing:.4px;color:#fff;background:#ef4444;vertical-align:1px;">CANLI · KATEGORİ VARSAYIMI KONTROL ET</span></div><div class="card-file">2027 Yılı Grup Bütçeleri.hta &bull; Muavin hesap × baz ay × çarpan</div></div></a>
+    </div>
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="section s3" id="sec-3">
+    <div class="sec-header">
+      <div class="sec-dot"></div><div class="sec-title">Satış, Ciro &amp; Verimlilik</div>
+      <div class="sec-count">16 dosya</div><a class="sec-toggle" onclick="toggleSec('sec-3');return false;" href="#">[daralt]</a>
+    </div>
+    <div class="card-grid sec-body">
+      <a class="link-card featured" onclick="openFile('GRUP BAZLI DEPO ANALİZİ.hta');return false;" href="#"><div class="card-icon">📦</div><div><div class="card-title">Grup Bazlı Depo Analizi <span class="featured-badge">SECENART+PRENSES+SECENGİDA · CANLI</span></div><div class="card-file">GRUP BAZLI DEPO ANALİZİ.hta</div></div></a>
+      <a class="link-card" onclick="openFile('2026_GRUP_AYLIK_CİRO_MATRİS.hta');return false;" href="#"><div class="card-icon">📊</div><div><div class="card-title">2026 Grup Aylık Ciro Matrisi</div><div class="card-file">2026_GRUP_AYLIK_CİRO_MATRİS.hta</div></div></a>
+      <a class="link-card" onclick="openFile('GRUPBUYUME.hta');return false;" href="#"><div class="card-icon">📈</div><div><div class="card-title">Grup Büyüme</div><div class="card-file">GRUPBUYUME.hta &bull; Canlı</div></div></a>
+      <a class="link-card" onclick="openFile('GRUP_CİRO_GRAFİK.hta');return false;" href="#"><div class="card-icon">📊</div><div><div class="card-title">Grup Ciro Grafik</div><div class="card-file">GRUP_CİRO_GRAFİK.hta &bull; Canlı</div></div></a>
+      <a class="link-card" onclick="openFile('FİRMA MAL ALIMLARI.hta');return false;" href="#"><div class="card-icon">🛍️</div><div><div class="card-title">Firma Mal Alımları</div><div class="card-file">FİRMA MAL ALIMLARI.hta &bull; Canlı</div></div></a>
+      <a class="link-card featured" onclick="openFile('FİRMA ENFLASYON ANALİZİ.hta');return false;" href="#"><div class="card-icon">📉</div><div><div class="card-title">Firma Enflasyonu &amp; Makro Durum <span class="featured-badge">TÜİK KIYASLAMALI</span></div><div class="card-file">FİRMA ENFLASYON ANALİZİ.hta</div></div></a>
+      <a class="link-card featured" onclick="openFile('MAKRO EKONOMİK VERİLER.hta');return false;" href="#"><div class="card-icon">🌍</div><div><div class="card-title">Makro Ekonomik Veriler <span class="featured-badge">TCMB &amp; TÜİK · AY BAZLI</span></div><div class="card-file">MAKRO EKONOMİK VERİLER.hta</div></div></a>
+      <a class="link-card" onclick="openFile('GRUP FİRMA İŞÇİLİKLERİ.hta');return false;" href="#"><div class="card-icon">👥</div><div><div class="card-title">Grup Firma İşçilikleri</div><div class="card-file">GRUP FİRMA İŞÇİLİKLERİ.hta &bull; Canlı</div></div></a>
+      <a class="link-card" onclick="openFile('SECENGIDA_PRENSES_IMALAT_KAYIP_ANALIZI.hta');return false;" href="#"><div class="card-icon">⏱️</div><div><div class="card-title">İmalat Kayıp Analizi</div><div class="card-file">SECENGIDA_PRENSES_IMALAT_KAYIP_ANALIZI.hta &bull; Canlı</div></div></a>
+      <a class="link-card" onclick="openFile('RANDIMAN PIVOT.hta');return false;" href="#"><div class="card-icon">⚙️</div><div><div class="card-title">Randıman Pivot</div><div class="card-file">RANDIMAN PIVOT.hta</div></div></a>
+      <a class="link-card" onclick="openFile('2026_PRENSES_RANDIMAN.hta');return false;" href="#"><div class="card-icon">⚙️</div><div><div class="card-title">Prenses Randıman</div><div class="card-file">2026_PRENSES_RANDIMAN.hta</div></div></a>
+      <a class="link-card" onclick="openFile('2026_SECENGIDA_RANDIMAN.hta');return false;" href="#"><div class="card-icon">⚙️</div><div><div class="card-title">Secengida Randıman</div><div class="card-file">2026_SECENGIDA_RANDIMAN.hta</div></div></a>
+      <a class="link-card" onclick="openFile('GRUP FİRMALAR STOK YAŞLANDIRMA.hta');return false;" href="#"><div class="card-icon">📦</div><div><div class="card-title">Grup Firmalar Stok Yaşlandırma</div><div class="card-file">GRUP FİRMALAR STOK YAŞLANDIRMA.hta &bull; Canlı</div></div></a>
+      <a class="link-card" onclick="openFile('SECENABCANALIZÌ.hta');return false;" href="#"><div class="card-icon">🔤</div><div><div class="card-title">Secengida ABC Analizi &bull; Canlı</div><div class="card-file">SECENABCANALIZÌ.hta</div></div></a>
+      <a class="link-card" onclick="openFile('secenart_ciro_analiz.hta');return false;" href="#"><div class="card-icon">📊</div><div><div class="card-title">Secenart Ciro Analiz &bull; Canlı</div><div class="card-file">secenart_ciro_analiz.hta</div></div></a>
+      <a class="link-card" onclick="openFile('secengida_departman_analizi_2025.hta');return false;" href="#"><div class="card-icon">🏭</div><div><div class="card-title">Secengida Departman Analizi &bull; Canlı</div><div class="card-file">secengida_departman_analizi_2025.hta</div></div></a>
+      <a class="link-card" onclick="openFile('SECEN_CAFE_OSB.hta');return false;" href="#"><div class="card-icon">☕</div><div><div class="card-title">Secen Cafe OSB</div><div class="card-file">SECEN_CAFE_OSB.hta</div></div></a>
+    </div>
+  </div>
+
+  <!-- SECTION 4 -->
+  <div class="section s4" id="sec-4">
+    <div class="sec-header">
+      <div class="sec-dot"></div><div class="sec-title">İzlenebilirlik — Secengida</div>
+      <div class="sec-count">4 dosya</div><a class="sec-toggle" onclick="toggleSec('sec-4');return false;" href="#">[daralt]</a>
+    </div>
+    <div class="card-grid sec-body">
+      <a class="link-card" onclick="openIzlenebilirlikCanli();return false;" href="#"><div class="card-icon">🔍</div><div><div class="card-title">SECENGIDA İzlenebilirlik 2026 — Canlı</div><div class="card-file">SECENGIDA_IZLENEBILIRLIK_2026_CANLI.html · port 5342</div></div></a>
+      <a class="link-card" onclick="openUretimTakipFormu();return false;" href="#" style="background:linear-gradient(135deg,#1a3a6b,#0f2547);border:1.5px solid #b06000;box-shadow:0 0 0 1px #b0600040,0 4px 16px rgba(176,96,0,.3);"><div class="card-icon" style="background:#1a66cc4d;box-shadow:0 0 10px rgba(26,102,204,.5);">📋</div><div><div class="card-title">Üretim Takip Formu <span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:5px;font-size:8.5px;font-weight:800;letter-spacing:.4px;color:#fff;background:#b06000;vertical-align:1px;">CANLI · A4 YATAY YAZDIR</span></div><div class="card-file">SECENGIDA_URETIM_TAKIP_FORMU.html · port 5342</div></div></a>
+      <a class="link-card" onclick="openIzlenebilirlikPrensesCanli();return false;" href="#"><div class="card-icon">🔍</div><div><div class="card-title">PRENSES İzlenebilirlik 2026 — Canlı</div><div class="card-file">PRENSES_IZLENEBILIRLIK_2026_CANLI.html · port 5343</div></div></a>
+      <a class="link-card" onclick="openUretimTakipFormuPrenses();return false;" href="#" style="background:linear-gradient(135deg,#3b2a6b,#1e1447);border:1.5px solid #7c3aed;box-shadow:0 0 0 1px #7c3aed40,0 4px 16px rgba(124,58,237,.3);"><div class="card-icon" style="background:#7c3aed4d;box-shadow:0 0 10px rgba(124,58,237,.5);">📋</div><div><div class="card-title">PRENSES Üretim Takip Formu <span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:5px;font-size:8.5px;font-weight:800;letter-spacing:.4px;color:#fff;background:#7c3aed;vertical-align:1px;">CANLI · A4 YATAY YAZDIR</span></div><div class="card-file">PRENSES_URETIM_TAKIP_FORMU.html · port 5343</div></div></a>
+    </div>
+  </div>
+
+  <!-- SECTION 5 -->
+  <div class="section s5" id="sec-5">
+    <div class="sec-header">
+      <div class="sec-dot"></div><div class="sec-title">Lokasyon &amp; Harita Analizleri</div>
+      <div class="sec-count">3 dosya</div><a class="sec-toggle" onclick="toggleSec('sec-5');return false;" href="#">[daralt]</a>
+    </div>
+    <div class="card-grid sec-body">
+      <a class="link-card" onclick="openFile('SECENGIDA_LOKASYON_HARITA.hta');return false;" href="#"><div class="card-icon">📍</div><div><div class="card-title">Secengida Lokasyon Haritası</div><div class="card-file">SECENGIDA_LOKASYON_HARITA.hta</div></div></a>
+      <a class="link-card" onclick="openFile('PRENSES_LOKASYON_HARITA.hta');return false;" href="#"><div class="card-icon">📍</div><div><div class="card-title">Prenses Lokasyon Haritası</div><div class="card-file">PRENSES_LOKASYON_HARITA.hta</div></div></a>
+      <a class="link-card" onclick="openFile('CARREFOUR_SATIS_HARITA.hta');return false;" href="#"><div class="card-icon">📍</div><div><div class="card-title">Carrefour Satış Haritası</div><div class="card-file">CARREFOUR_SATIS_HARITA.hta</div></div></a>
+    </div>
+  </div>
+
+  <!-- SECTION 6 -->
+  <div class="section s6" id="sec-6">
+    <div class="sec-header">
+      <div class="sec-dot"></div><div class="sec-title">Carrefour Raporları</div>
+      <div class="sec-count">2 dosya</div><a class="sec-toggle" onclick="toggleSec('sec-6');return false;" href="#">[daralt]</a>
+    </div>
+    <div class="card-grid sec-body">
+      <a class="link-card" onclick="openFile('CARREFOUR_SATIS_RAPOR.hta');return false;" href="#"><div class="card-icon">🏬</div><div><div class="card-title">Carrefour Satış Raporu</div><div class="card-file">CARREFOUR_SATIS_RAPOR.hta</div></div></a>
+      <a class="link-card" onclick="openFile('CARREFOUR_PRENSES_RAPORU.hta');return false;" href="#"><div class="card-icon">🏬</div><div><div class="card-title">Carrefour Prenses Raporu</div><div class="card-file">CARREFOUR_PRENSES_RAPORU.hta</div></div></a>
+    </div>
+  </div>
+
+  <!-- SECTION 7 -->
+  <div class="section s7" id="sec-7">
+    <div class="sec-header">
+      <div class="sec-dot"></div><div class="sec-title">Market Fiyat Karşılaştırma</div>
+      <div class="sec-count">2 dosya</div><a class="sec-toggle" onclick="toggleSec('sec-7');return false;" href="#">[daralt]</a>
+    </div>
+    <div class="card-grid sec-body">
+      <a class="link-card" onclick="openMarketRaporuOnline();return false;" href="#"><div class="card-icon">🛒</div><div><div class="card-title">Market Fiyatları</div><div class="card-file">market-fiyatlari.onrender.com</div></div></a>
+      <a class="link-card" onclick="openMarketRaporu('MARKET FİYAT APPLE.html');return false;" href="#"><div class="card-icon">🍎</div><div><div class="card-title">Market Fiyat — Apple Sürümü</div><div class="card-file">MARKET FİYAT APPLE.html</div></div></a>
+    </div>
+  </div>
+
+  <!-- SECTION 8 -->
+  <div class="section s8" id="sec-8">
+    <div class="sec-header">
+      <div class="sec-dot"></div><div class="sec-title">Diğer Uygulamalar</div>
+      <div class="sec-count">10 dosya</div><a class="sec-toggle" onclick="toggleSec('sec-8');return false;" href="#">[daralt]</a>
+    </div>
+    <div class="card-grid sec-body">
+      <a class="link-card featured" onclick="openFile('BORDRO_TALEP_EDILEN_UCRET.hta');return false;" href="#"><div class="card-icon">🏦</div><div><div class="card-title">Bordro — Talep Edilen Ücret Karşılaştırması <span class="featured-badge" style="background:#f97316;color:#1a0f00;font-weight:900;">CANLI · DÖNEM/ŞİRKET FİLTRELİ</span></div><div class="card-file">BORDRO_TALEP_EDILEN_UCRET.hta &bull; localhost:5175 + LİST.xlsx eşleştirme</div></div></a>
+      <a class="link-card" onclick="openFile('OTO_YEDEK_PARCA.hta');return false;" href="#"><div class="card-icon">🚗</div><div><div class="card-title">Oto Yedek Parça — Fiyat Karşılaştırma</div><div class="card-file">OTO_YEDEK_PARCA.hta</div></div></a>
+      <a class="link-card" onclick="openB2BSevkiyat();return false;" href="#"><div class="card-icon">🚚</div><div><div class="card-title">B2B &amp; Sevkiyat</div><div class="card-file">B2B &amp; SEVKİYAT.html</div></div></a>
+      <a class="link-card" onclick="openFile('ZAMAN ETÜDÜ GRUP.hta');return false;" href="#"><div class="card-icon">⏱️</div><div><div class="card-title">Zaman Etüdü Grup</div><div class="card-file">ZAMAN ETÜDÜ GRUP.hta</div></div></a>
+      <a class="link-card" onclick="openFile('mobil_gorunum.html');return false;" href="#"><div class="card-icon">📱</div><div><div class="card-title">Mobil Görünüm</div><div class="card-file">mobil_gorunum.html</div></div></a>
+      <a class="link-card featured" onclick="openOdemeTakip();return false;" href="#"><div class="card-icon">⚖️</div><div><div class="card-title">HUKUK İŞLERİ <span class="featured-badge">CANLI · İCRA &amp; ÖDEME TAKİP</span></div><div class="card-file">localhost:5350 &bull; Hukuk</div></div></a>
+      <a class="link-card featured" onclick="openFireIzleme();return false;" href="#"><div class="card-icon">🔥</div><div><div class="card-title">SECENGIDA Fire İzleme <span class="featured-badge">CANLI · MANUEL GİRİŞ</span></div><div class="card-file">localhost:5344 &bull; Departman bazlı fire takibi &bull; Temmuz 2026 geçmiş verisi yüklü</div></div></a>
+      <a class="link-card featured" onclick="openFile('PRENSES_KDV_IADE_TABLOSU.hta');return false;" href="#"><div class="card-icon">📊</div><div><div class="card-title">Prenses KDV İade Tablosu <span class="featured-badge">CANLI · EXCEL'E AKTAR</span></div><div class="card-file">PRENSES_KDV_IADE_TABLOSU.hta</div></div></a>
+      <a class="link-card featured" onclick="openFile('SECENGIDA_KDV_IADE_TABLOSU.hta');return false;" href="#"><div class="card-icon">📊</div><div><div class="card-title">Seçen Gıda KDV İade Tablosu <span class="featured-badge">CANLI · EXCEL'E AKTAR</span></div><div class="card-file">SECENGIDA_KDV_IADE_TABLOSU.hta</div></div></a>
+      <a class="link-card" onclick="openExternalUrl('https://e-ticaret-uygulamasi-ruby.vercel.app/');return false;" href="#" style="background:#151c34;border:1.5px solid #22c55e55;border-left:4px solid #22c55e;box-shadow:0 0 0 1px #22c55e33,0 4px 16px rgba(34,197,94,.25);"><div class="card-icon" style="background:#22c55e33;box-shadow:0 0 10px rgba(34,197,94,.45);">🛍️</div><div><div class="card-title">E-Ticaret <span class="featured-badge" style="background:#22c55e;color:#052e16;">CANLI · WEB</span></div><div class="card-file">e-ticaret-uygulamasi-ruby.vercel.app</div></div></a>
+    </div>
+  </div>
+
+  <!-- SECTION 9 -->
+  <div class="section s10" id="sec-9">
+    <div class="sec-header">
+      <div class="sec-dot"></div><div class="sec-title">Stok Analizleri</div>
+      <div class="sec-count">5 dosya</div><a class="sec-toggle" onclick="toggleSec('sec-9');return false;" href="#">[daralt]</a>
+    </div>
+    <div class="card-grid sec-body">
+      <a class="link-card featured" onclick="openFile('GRUP_STOK_DEVIR_GUN_SAYISI.hta');return false;" href="#"><div class="card-icon">📦</div><div><div class="card-title">Grup Stok Devir Gün Sayısı <span class="featured-badge">2026 vs 2025</span></div><div class="card-file">GRUP_STOK_DEVIR_GUN_SAYISI.hta</div></div></a>
+      <a class="link-card" onclick="openFile('GRUP FİRMALAR STOK YAŞLANDIRMA.hta');return false;" href="#"><div class="card-icon">📦</div><div><div class="card-title">Grup Firmalar Stok Yaşlandırma</div><div class="card-file">GRUP FİRMALAR STOK YAŞLANDIRMA.hta &bull; Canlı</div></div></a>
+      <a class="link-card featured" onclick="openSecenMinMax();return false;" href="#"><div class="card-icon">📦</div><div><div class="card-title">SECEN Hammadde Min/Max Stok Yapısı <span class="featured-badge">CANLI</span></div><div class="card-file">SECEN MAX MİN STOK YAPISI.html</div></div></a>
+      <a class="link-card featured" onclick="openAltCariler();return false;" href="#"><div class="card-icon">📦</div><div><div class="card-title">Alt Cariler Miktar Tutar Tablosu <span class="featured-badge">CANLI</span></div><div class="card-file">ALT CARİLER MİKTAR TUTAR TABLOSU.html</div></div></a>
+      <a class="link-card featured" onclick="openReceteMaliyeti();return false;" href="#"><div class="card-icon">🧾</div><div><div class="card-title">Grup Reçete Maliyeti <span class="featured-badge">CANLI</span></div><div class="card-file">GRUP REÇETE MALİYETİ.html &bull; SECENGİDA / PRENSES</div></div></a>
+    </div>
+  </div>
+
+  <!-- SECTION 10 (her zaman en altta) -->
+  <div class="section s9 section-muted" id="sec-10">
+    <div class="sec-header">
+      <div class="sec-dot"></div><div class="sec-title">Sistem &amp; Sunucu Araçları</div>
+      <div class="sec-count">5 dosya</div><a class="sec-toggle" onclick="toggleSec('sec-10');return false;" href="#">[daralt]</a>
+    </div>
+    <div class="card-grid sec-body">
+      <a class="link-card" onclick="openFile('Yerel Market Sunucusunu Başlat.bat');return false;" href="#"><div class="card-icon">🖥️</div><div><div class="card-title">Yerel Market Sunucusunu Başlat</div><div class="card-file">Yerel Market Sunucusunu Başlat.bat</div></div></a>
+      <a class="link-card" onclick="openFile('Sunucuyu_Baslat.bat');return false;" href="#"><div class="card-icon">🖥️</div><div><div class="card-title">Sunucuyu Başlat</div><div class="card-file">Sunucuyu_Baslat.bat</div></div></a>
+      <a class="link-card" onclick="openFile('start_yerel_market_server_hidden.vbs');return false;" href="#"><div class="card-icon">🖥️</div><div><div class="card-title">Market Sunucusu — Gizli Başlat</div><div class="card-file">start_yerel_market_server_hidden.vbs</div></div></a>
+      <a class="link-card" onclick="openFile('CARREFOUR_RAPOR_AC.bat');return false;" href="#"><div class="card-icon">🖥️</div><div><div class="card-title">Carrefour Raporu Aç</div><div class="card-file">CARREFOUR_RAPOR_AC.bat</div></div></a>
+      <a class="link-card" onclick="openFile('KURULUM.bat');return false;" href="#"><div class="card-icon">🖥️</div><div><div class="card-title">Kurulum</div><div class="card-file">KURULUM.bat</div></div></a>
+    </div>
+  </div>
+
+  <div class="footer">
+    CLAUDE - Panosu &bull; Desktop\CLAUDE Çalışan Dosyalar Panosu &bull; İshak DURMUŞ, Mali İşler Direktörü &bull; Temmuz 2026
+  </div>
+
+</div>
+
+<script type="text/javascript">
+
+// ─── Sabit üst bloğun yüksekliği kadar içeriğe boşluk bırak ──────────────────
+function fitHeader() {
+    var ft = document.getElementById('fixedTop');
+    var mc = document.getElementById('mainContent');
+    if (ft && mc) { mc.style.paddingTop = (ft.offsetHeight + 6) + 'px'; }
+}
+// ─── Türkiye saati (UTC+3, DST yok) ───────────────────────────────────────────
+function turkeyNow() {
+    var d = new Date();
+    var utcMs = d.getTime() + (d.getTimezoneOffset() * 60000);
+    return new Date(utcMs + 3 * 3600000);
+}
+function setTodayBadge() {
+    var AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    var GUNLER = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+    var d = turkeyNow();
+    var el = document.getElementById('todayBadge');
+    if (el) { el.textContent = GUNLER[d.getDay()] + ', ' + d.getDate() + ' ' + AYLAR[d.getMonth()] + ' ' + d.getFullYear(); }
+}
+function setAnalogClock() {
+    var d = turkeyNow();
+    var h = d.getHours() % 12, m = d.getMinutes(), s = d.getSeconds(), ms = d.getMilliseconds();
+    var secFrac = s + ms / 1000;
+    var minFrac = m + secFrac / 60;
+    var hourDeg = (h * 30) + (minFrac * 0.5);
+    var minDeg = minFrac * 6;
+    var secDeg = secFrac * 6;
+    var hourEl = document.getElementById('clockHour');
+    var minEl = document.getElementById('clockMin');
+    var secEl = document.getElementById('clockSec');
+    if (hourEl) { hourEl.setAttribute('transform', 'rotate(' + hourDeg + ' 50 50)'); }
+    if (minEl) { minEl.setAttribute('transform', 'rotate(' + minDeg + ' 50 50)'); }
+    if (secEl) { secEl.setAttribute('transform', 'rotate(' + secDeg + ' 50 50)'); }
+}
+setTodayBadge();
+setAnalogClock();
+setInterval(setTodayBadge, 1000);
+setInterval(setAnalogClock, 200);
+window.onload = fitHeader;
+window.onresize = fitHeader;
+fitHeader();
+
+// ─── Döviz kurları (TCMB günlük kur XML'i) ───────────────────────────────────
+function fmtRate(v) {
+    var n = parseFloat(v);
+    if (isNaN(n)) return '—';
+    return n.toFixed(2).replace('.', ',');
+}
+
+function loadFX() {
+    var body = document.getElementById('fxBody');
+    var dateEl = document.getElementById('fxDate');
+    var btn = document.getElementById('fxRefresh');
+    body.innerHTML = '<div class="fx-loading">TCMB kurları yükleniyor...</div>';
+    if (btn) { btn.className = 'fx-refresh spinning'; }
+    fitHeader();
+    try {
+        var xhr = new ActiveXObject('Msxml2.XMLHTTP.6.0');
+        xhr.open('GET', 'https://www.tcmb.gov.tr/kurlar/today.xml', true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== 4) return;
+            try {
+                if (xhr.status !== 200) throw new Error('HTTP ' + xhr.status);
+                var doc = new ActiveXObject('Msxml2.DOMDocument.6.0');
+                doc.async = false;
+                doc.loadXML(xhr.responseText);
+                var root = doc.selectSingleNode('Tarih_Date');
+                if (root && dateEl) {
+                    var nowT = new Date();
+                    var hh = ('0' + nowT.getHours()).slice(-2);
+                    var mm = ('0' + nowT.getMinutes()).slice(-2);
+                    dateEl.innerHTML = '· ' + root.getAttribute('Tarih') + ' · Güncellendi: ' + hh + ':' + mm;
+                }
+
+                function curBlock(code, label) {
+                    var node = doc.selectSingleNode("Tarih_Date/Currency[@CurrencyCode='" + code + "']");
+                    if (!node) return '';
+                    var fb = node.selectSingleNode('ForexBuying');
+                    var fs = node.selectSingleNode('ForexSelling');
+                    var bb = node.selectSingleNode('BanknoteBuying');
+                    var bs = node.selectSingleNode('BanknoteSelling');
+                    var fbv = fb ? fmtRate(fb.text) : '—';
+                    var fsv = fs ? fmtRate(fs.text) : '—';
+                    var bbv = bb ? fmtRate(bb.text) : '—';
+                    var bsv = bs ? fmtRate(bs.text) : '—';
+                    return '<div class="fx-cur-block"><div class="fx-cur-code">' + label + '</div>' +
+                        '<div class="fx-cur-rates">' +
+                        '<span class="fx-lbl">Döviz</span><b>' + fbv + '</b> / <b>' + fsv + '</b><br>' +
+                        '<span class="fx-lbl">Efektif</span><b>' + bbv + '</b> / <b>' + bsv + '</b>' +
+                        '</div></div>';
+                }
+
+                var html = curBlock('USD', '$') + curBlock('EUR', '€');
+                if (!html) throw new Error('Kur verisi bulunamadi');
+                body.innerHTML = html;
+                fitHeader();
+            } catch (e2) {
+                body.innerHTML = '<div class="fx-error">Kurlar alinamadi (' + e2.message + ')</div>';
+                fitHeader();
+            }
+            if (btn) { btn.className = 'fx-refresh'; }
+        };
+        xhr.send();
+    } catch (e) {
+        body.innerHTML = '<div class="fx-error">Kurlar alinamadi (internet/ActiveX)</div>';
+        if (btn) { btn.className = 'fx-refresh'; }
+    }
+}
+loadFX();
+setInterval(loadFX, 15 * 60 * 1000); // Pano açık kaldığı sürece kurları 15 dakikada bir otomatik yenile
+
+// ─── Dosya açma fonksiyonu (WScript.Shell ile) ───────────────────────────────
+var _baseDir = null;
+
+function getBaseDir() {
+    if (_baseDir) return _baseDir;
+    try {
+        var href = window.location.href;
+        href = href.replace(/^file:\/\/\//i, '');
+        try { href = decodeURIComponent(href); } catch(ex) {}
+        href = href.replace(/\//g, '\\');
+        var p = href.lastIndexOf('\\');
+        if (p >= 0) href = href.substring(0, p + 1); // = ...Desktop\
+        _baseDir = href + 'CLAUDE\\';
+    } catch(e) {
+        _baseDir = '';
+    }
+    return _baseDir;
+}
+
+function openFile(fn) {
+    try {
+        var sh = new ActiveXObject('WScript.Shell');
+        var dir = getBaseDir();
+        var fullPath = dir + fn;
+        sh.Run('"' + fullPath + '"', 1, false);
+    } catch(e) {
+        var dir2 = getBaseDir();
+        alert('Dosya açılamadı.\n\nKlasör: ' + dir2 + '\nDosya: ' + fn + '\n\nLütfen dosyanın bu klasörde bulunduğunu kontrol edin.\n\nHata: ' + e.message);
+    }
+}
+
+// Yerel sunucu tabanlı (Node.js köprü) raporlar: port kapalıysa ilgili gizli VBS'i başlatıp
+// sunucunun ayağa kalkmasını bekler. Startup'ta zaten daima çalışır durumda tutulan sunucular için
+// bu, sadece oturum yeniden başlamış/sunucu bir şekilde kapanmışsa devreye giren bir güvence katmanıdır.
+function ensureLocalServer(port, vbsName) {
+    var calisiyor = false;
+    try {
+        var xhr = new ActiveXObject('Msxml2.XMLHTTP.6.0');
+        xhr.open('GET', 'http://localhost:' + port + '/api/durum', false);
+        xhr.send();
+        calisiyor = (xhr.status === 200);
+    } catch (e) { calisiyor = false; }
+
+    if (!calisiyor) {
+        try {
+            var sh = new ActiveXObject('WScript.Shell');
+            sh.Run('wscript.exe "' + getBaseDir() + vbsName + '"', 0, false);
+            sh.Run('cmd /c timeout /t 2 /nobreak >nul', 0, true);
+        } catch (e2) { /* sunucu başlatılamadıysa rapor yine de açılır, sayfa kendi hata mesajını gösterir */ }
+    }
+}
+
+function openReceteMaliyeti() {
+    ensureLocalServer(5337, 'start_recete_maliyet_server_hidden.vbs');
+    openFile('GRUP REÇETE MALİYETİ.html');
+}
+
+function openMarketRaporu(fn) {
+    ensureLocalServer(5333, 'start_yerel_market_server_hidden.vbs');
+    openFile(fn);
+}
+
+function openMarketRaporuOnline() {
+    try {
+        var sh = new ActiveXObject('WScript.Shell');
+        sh.Run('https://market-fiyatlari.onrender.com/', 1, false);
+    } catch(e) {
+        alert('Uygulama açılamadı.\n\nHata: ' + e.message);
+    }
+}
+
+function openExternalUrl(url) {
+    try {
+        var sh = new ActiveXObject('WScript.Shell');
+        sh.Run(url, 1, false);
+    } catch(e) {
+        alert('Bağlantı açılamadı.\n\nHata: ' + e.message);
+    }
+}
+
+function openB2BSevkiyat() {
+    ensureLocalServer(5334, 'start_b2b_sevkiyat_server_hidden.vbs');
+    openFile('B2B & SEVKİYAT.html');
+}
+
+function openSecenMinMax() {
+    ensureLocalServer(5335, 'start_secen_minmax_server_hidden.vbs');
+    openFile('SECEN MAX MİN STOK YAPISI.html');
+}
+
+function openAltCariler() {
+    ensureLocalServer(5336, 'start_alt_carier_server_hidden.vbs');
+    openFile('ALT CARİLER MİKTAR TUTAR TABLOSU.html');
+}
+
+function openBirikimKarZarar() {
+    ensureLocalServer(5339, 'start_birikim_karzarar_server_hidden.vbs');
+    openFile('GRUP_USRE_KAR_ZARAR.html');
+}
+
+function openAbcAnalizi() {
+    ensureLocalServer(5340, 'start_abc_analizi_server_hidden.vbs');
+    openFile('GRUP ŞİRKET ABC ANALİZİ.html');
+}
+
+function openGrupUrunMaliyetleri() {
+    ensureLocalServer(5341, 'start_grup_urun_maliyet_server_hidden.vbs');
+    openFile('GRUP ÜRÜN MALİYETLERİ.html');
+}
+
+function openIzlenebilirlikCanli() {
+    ensureLocalServer(5342, 'start_izlenebilirlik_server_hidden.vbs');
+    openFile('SECENGIDA_IZLENEBILIRLIK_2026_CANLI.html');
+}
+
+function openOdemeTakip() {
+    ensureLocalServer(5350, 'start_odeme_takip_server_hidden.vbs');
+    try {
+        var sh = new ActiveXObject('WScript.Shell');
+        sh.Run('http://localhost:5350', 1, false);
+    } catch(e) {
+        alert('Uygulama açılamadı.\n\nHata: ' + e.message);
+    }
+}
+
+// 2026-08-15: Masa üstünde departman bazlı ayrı ayrı tutulan Excel fire raporlarının (Desktop\FİRE
+// İZLEME\07-FİRE RAPORU TEMMUZ.xlsx) yerini alan tek ekranlı manuel fire kayıt sistemi.
+function openFireIzleme() {
+    ensureLocalServer(5344, 'start_fire_izleme_server_hidden.vbs');
+    openFile('SECENGIDA FİRE İZLEME.html');
+}
+
+// 2026-08-13: Üretim Takip Formu, büyük İzlenebilirlik panosundan (CANLI.html) bağımsız,
+// kendi başlığı/sayfası olan SECENGIDA_URETIM_TAKIP_FORMU.html dosyasına taşındı — aynı
+// canlı sunucuya (port 5342) bağlanır, ayrıca sağlıklı bir openFile() yeterli (hash yok).
+function openUretimTakipFormu() {
+    ensureLocalServer(5342, 'start_izlenebilirlik_server_hidden.vbs');
+    openFile('SECENGIDA_URETIM_TAKIP_FORMU.html');
+}
+
+function openIzlenebilirlikPrensesCanli() {
+    ensureLocalServer(5343, 'start_izlenebilirlik_prenses_server_hidden.vbs');
+    openFile('PRENSES_IZLENEBILIRLIK_2026_CANLI.html');
+}
+
+// 2026-08-15: SECENGIDA_URETIM_TAKIP_FORMU.html'in PRENSES için birebir kopyası — aynı canlı
+// sunucuya (izlenebilirlik_prenses_server.js, port 5343) bağlanır.
+function openUretimTakipFormuPrenses() {
+    ensureLocalServer(5343, 'start_izlenebilirlik_prenses_server_hidden.vbs');
+    openFile('PRENSES_URETIM_TAKIP_FORMU.html');
+}
+
+// CLAUDE\ dışındaki (Desktop kökündeki diğer) klasörlerdeki uygulamaları başlatmak için.
+function getDesktopDir() {
+    var base = getBaseDir(); // ...Desktop\CLAUDE\
+    return base.substring(0, base.length - 'CLAUDE\\'.length);
+}
+
+function openDesktopApp(relPath) {
+    try {
+        var sh = new ActiveXObject('WScript.Shell');
+        var fullPath = getDesktopDir() + relPath;
+        sh.Run('"' + fullPath + '"', 1, false);
+    } catch(e) {
+        alert('Uygulama başlatılamadı.\n\nDosya: ' + relPath + '\n\nHata: ' + e.message);
+    }
+}
+
+// ─── Arama fonksiyonu ─────────────────────────────────────────────────────────
+function doSearch() {
+    var q = document.getElementById('searchInput').value.toLowerCase();
+    var cards = document.getElementsByClassName('link-card');
+    var vis = 0;
+    for (var i = 0; i < cards.length; i++) {
+        var show = !q || cards[i].innerHTML.toLowerCase().indexOf(q) >= 0;
+        cards[i].className = show
+            ? cards[i].className.replace(' hidden','')
+            : (cards[i].className.indexOf('hidden') < 0 ? cards[i].className + ' hidden' : cards[i].className);
+        if (show) vis++;
+    }
+    var rc = document.getElementById('resultCount');
+    if (q) {
+        rc.innerHTML = vis + ' dosya bulundu';
+        rc.style.color = vis > 0 ? '#60a5fa' : '#fc8181';
+    } else {
+        rc.innerHTML = '';
+    }
+}
+
+// ─── İK Modülü combo box aç/kapat ─────────────────────────────────────────────
+function toggleHrModule() {
+    var mod = document.getElementById('hrModule');
+    if (!mod) return;
+    var isOpen = (' ' + mod.className + ' ').indexOf(' open ') >= 0;
+    mod.className = isOpen ? mod.className.replace(' open', '') : mod.className + ' open';
+    fitHeader();
+}
+
+// ─── Bölüm daralt/genişlet ────────────────────────────────────────────────────
+function toggleSec(id) {
+    var sec = document.getElementById(id);
+    if (!sec) return;
+    var bodies = sec.getElementsByClassName('sec-body');
+    var toggle = sec.getElementsByClassName('sec-toggle')[0];
+    if (!bodies.length) return;
+    var isHidden = bodies[0].style.display === 'none';
+    bodies[0].style.display = isHidden ? '' : 'none';
+    if (toggle) toggle.innerHTML = isHidden ? '[daralt]' : '[genişlet]';
+}
+
+</script>
+</body>
+</html>
