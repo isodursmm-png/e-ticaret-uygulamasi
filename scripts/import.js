@@ -4,7 +4,8 @@
    Kullanım:
      1) .env dosyasını doldurun (bkz. .env.example)
      2) npm install
-     3) npm run import
+     3) npm run import            # Supabase'e yaz
+        npm run import:local      # Supabase'e YAZMA; public/local.html önizlemesi üret
    ========================================================================== */
 'use strict';
 require('dotenv').config();
@@ -13,12 +14,14 @@ const path = require('path');
 const XLSX = require('xlsx');
 const { createClient } = require('@supabase/supabase-js');
 const { buildPayload, summary, compactGeo } = require('./lib/normalize');
+const { writeLocal } = require('./lib/local-preview');
 
+const LOCAL = process.argv.includes('--local');
 const SRC = process.env.XLSX_DIR || 'C:/Users/İshak DURMUŞ/Desktop/ETICARET/Eticaret';
 const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE;
 
-if (!URL || !KEY) {
+if (!LOCAL && (!URL || !KEY)) {
   console.error('HATA: .env içinde SUPABASE_URL ve SUPABASE_SERVICE_ROLE gerekli.');
   process.exit(1);
 }
@@ -45,6 +48,12 @@ const rd = (f) => {
   const geoPath = path.join(__dirname, 'tr-cities.json');
   try { geo = compactGeo(JSON.parse(fs.readFileSync(geoPath, 'utf8'))); }
   catch (e) { console.warn('geo okunamadı, atlanıyor:', e.message); }
+
+  if (LOCAL) {
+    writeLocal(P, geo);
+    console.log(`  ${P.meta.orders} sipariş · ${P.meta.items} kalem · ${P.meta.minDate} – ${P.meta.maxDate}`);
+    return;
+  }
 
   const sb = createClient(URL, KEY, { auth: { persistSession: false } });
   const { error } = await sb.from('analytics_payload').upsert({

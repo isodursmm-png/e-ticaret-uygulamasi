@@ -6,11 +6,19 @@
   "scripts": {
     "build:web": "node scripts/build-web.js",
     "import": "node scripts/import.js",
+    "import:local": "node scripts/import.js --local",
+    "topla": "node scripts/topla.js",
+    "topla:dry": "node scripts/topla.js --dry-run",
+    "topla:local": "node scripts/topla.js --local",
     "dev": "node scripts/serve.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "dotenv": "^16.4.5",
+    "fast-xml-parser": "^5.11.1",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
   }
 }

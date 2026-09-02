@@ -6,3 +6,7 @@ public/config.js
 .DS_Store
 .vercel
 .netlify
+scripts/.pw-state/
+*.local.json
+public/data.local.js
+public/local.html

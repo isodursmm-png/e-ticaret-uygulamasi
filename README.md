@@ -86,3 +86,66 @@ npm run build:web
 Pano içindeki **“Grafiği e‑posta ile gönder”** düğmesi `localhost:8788`’deki yerel servise
 bağlıdır; uzak kullanıcılarda çalışmaz, “yerel servis kapalı” uyarısı verir (zararsız).
 İstenirse ayrı bir sunucusuz fonksiyona taşınabilir.
+
+---
+
+## Canlı yenileme (xlsx yerine kaynaklardan otomatik çekim)
+
+`scripts/topla.js`, `import.js`’in **API/otomasyon** karşılığıdır: aynı `normalize.js`
+çekirdeğini ve aynı Supabase satırını (`analytics_payload / id='eticaret'`) kullanır.
+
+### Kaynaklar
+| Kaynak | Yöntem | Env |
+|---|---|---|
+| Ticimax (`SiparisServis.svc`) | SOAP `SelectSiparis` (canlı ✓) | `TICIMAX_API_URL` (site kökü), `TICIMAX_CODE` |
+| Trendyol GO / Market (`api.tgoapis.com`) | Grocery Sipariş API (canlı ✓) | `TGO_SELLER_ID`, `TGO_API_KEY`, `TGO_API_SECRET`, `TGO_API_BASE`, `TGO_ORDER_PATH` |
+| Trendyol Marketplace (`apigw.trendyol.com`) | Marketplace Sipariş API | `TRENDYOL_SELLER_ID`, `TRENDYOL_API_KEY`, `TRENDYOL_API_SECRET`, `TRENDYOL_API_BASE` |
+| Yemeksepeti (`partner-app.yemeksepeti.com`) | Playwright → Excel indir | `YEMEKSEPETI_USER/PASS` + `YS_SEL_*`, `YS_REPORT_URL` |
+| Trendyol GO panel (`partner.tgomarket.com`) | Playwright (yalnızca TGO API yoksa) | `TGO_USER/PASS` + `TGO_SEL_*`, `TGO_ORDERS_URL`, `TGO_COMMISSION_URL` |
+
+Env eksik olan kaynak **atlanır** (hata vermez). `FETCH_DAYS=0` → tüm geçmiş.
+Tüm değişkenler `.env.example`’da.
+
+### Yerel önizleme (Supabase'siz)
+```bash
+npm run topla:local     # canlı kaynaklardan çek → public/local.html (login yok, git'e girmez)
+npm run import:local    # xlsx'ten aynı önizleme
+npm run dev             # http://localhost:4173/local.html
+```
+
+### Yerelde
+```bash
+npm install
+npx playwright install chromium      # sadece Yemeksepeti / TGO için
+copy .env.example .env               # doldur
+npm run topla                        # tüm yapılandırılmış kaynaklar
+npm run topla:dry                    # Supabase'e yazmadan özet
+node scripts/topla.js --only=ticimax,trendyol
+node scripts/topla.js --only=yemeksepeti --headed   # ilk giriş / 2FA — oturum scripts/.pw-state/ altına kaydolur
+```
+
+### Otomatik (GitHub Actions) — `.github/workflows/collect.yml`
+- **Saatlik cron** + elle `workflow_dispatch` + panodaki düğmeden `repository_dispatch: refresh`.
+- Repo **Secrets**: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE`, `TICIMAX_API_KEY`,
+  `TRENDYOL_SELLER_ID`, `TRENDYOL_API_KEY`, `TRENDYOL_API_SECRET`,
+  `YEMEKSEPETI_USER`, `YEMEKSEPETI_PASS`, `TGO_USER`, `TGO_PASS`.
+- Repo **Variables** (gizli değil): `TICIMAX_API_URL`, `TRENDYOL_API_BASE`, `FETCH_DAYS`,
+  panel seçicileri `YS_SEL_*` / `TGO_SEL_*`, `*_URL`.
+
+### Panodaki “⟳ Yenile” → `api/refresh.js` (Vercel)
+Oturumu doğrular, GitHub Actions `collect` iş akışını tetikler, `updated_at`
+değişince pano kendini yeniler. Playwright Vercel’de koşamadığı için tek motor
+GitHub Actions’tır.
+- **Vercel env**: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GH_DISPATCH_REPO`,
+  `GH_DISPATCH_TOKEN` (fine-grained PAT — *Contents: Read and write*), ops. `CRON_SECRET`.
+
+### Playwright seçicileri (ilk kurulum, bir kez)
+Panel arayüzü siteye özgü olduğundan giriş + “Dışa aktar” akışı kaydedilip
+seçiciler env’e yazılır:
+```bash
+npx playwright codegen https://partner-app.yemeksepeti.com/
+npx playwright codegen https://partner.tgomarket.com/
+```
+`ticimax.js` alan adları da kuruluma göre değişebilir; panelden dönen gerçek JSON
+ile `scripts/lib/sources/ticimax.js` içindeki `pick(...)` listelerini doğrulayın
+(TODO işaretli).

@@ -4,5 +4,8 @@
   "buildCommand": "node scripts/gen-config.js",
   "outputDirectory": "public",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "functions": {
+    "api/refresh.js": { "maxDuration": 30 }
+  }
 }

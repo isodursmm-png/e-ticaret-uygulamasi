@@ -1,0 +1,82 @@
+name: collect
+
+# Canlı veri motoru: kaynaklardan çek -> buildPayload -> Supabase.
+on:
+  schedule:
+    - cron: '0 * * * *'          # her saat başı (otonom)
+  workflow_dispatch: {}          # elle "Run workflow"
+  repository_dispatch:
+    types: [refresh]             # panodaki "⟳ Yenile" -> api/refresh -> buraya
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: topla
+        run: node scripts/topla.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
+          FETCH_DAYS: ${{ vars.FETCH_DAYS || '0' }}
+
+          TICIMAX_API_URL: ${{ vars.TICIMAX_API_URL }}
+          TICIMAX_CODE: ${{ secrets.TICIMAX_CODE }}
+          TICIMAX_TIMEOUT_MS: ${{ vars.TICIMAX_TIMEOUT_MS }}
+
+          TRENDYOL_SELLER_ID: ${{ secrets.TRENDYOL_SELLER_ID }}
+          TRENDYOL_API_KEY: ${{ secrets.TRENDYOL_API_KEY }}
+          TRENDYOL_API_SECRET: ${{ secrets.TRENDYOL_API_SECRET }}
+          TRENDYOL_API_BASE: ${{ vars.TRENDYOL_API_BASE }}
+
+          YEMEKSEPETI_USER: ${{ secrets.YEMEKSEPETI_USER }}
+          YEMEKSEPETI_PASS: ${{ secrets.YEMEKSEPETI_PASS }}
+          YS_LOGIN_URL: ${{ vars.YS_LOGIN_URL }}
+          YS_REPORT_URL: ${{ vars.YS_REPORT_URL }}
+          YS_SEL_EMAIL: ${{ vars.YS_SEL_EMAIL }}
+          YS_SEL_PASS: ${{ vars.YS_SEL_PASS }}
+          YS_SEL_SUBMIT: ${{ vars.YS_SEL_SUBMIT }}
+          YS_SEL_LOGGEDIN: ${{ vars.YS_SEL_LOGGEDIN }}
+          YS_SEL_EXPORT: ${{ vars.YS_SEL_EXPORT }}
+
+          TGO_SELLER_ID: ${{ secrets.TGO_SELLER_ID }}
+          TGO_API_KEY: ${{ secrets.TGO_API_KEY }}
+          TGO_API_SECRET: ${{ secrets.TGO_API_SECRET }}
+          TGO_API_BASE: ${{ vars.TGO_API_BASE }}
+          TGO_ORDER_PATH: ${{ vars.TGO_ORDER_PATH }}
+
+          TGO_USER: ${{ secrets.TGO_USER }}
+          TGO_PASS: ${{ secrets.TGO_PASS }}
+          TGO_LOGIN_URL: ${{ vars.TGO_LOGIN_URL }}
+          TGO_ORDERS_URL: ${{ vars.TGO_ORDERS_URL }}
+          TGO_COMMISSION_URL: ${{ vars.TGO_COMMISSION_URL }}
+          TGO_SEL_EMAIL: ${{ vars.TGO_SEL_EMAIL }}
+          TGO_SEL_PASS: ${{ vars.TGO_SEL_PASS }}
+          TGO_SEL_SUBMIT: ${{ vars.TGO_SEL_SUBMIT }}
+          TGO_SEL_LOGGEDIN: ${{ vars.TGO_SEL_LOGGEDIN }}
+          TGO_SEL_EXPORT: ${{ vars.TGO_SEL_EXPORT }}
+
+      - name: Playwright izleri (hata ayıklama)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pw-state
+          path: scripts/.pw-state/
+          if-no-files-found: ignore
+          retention-days: 3
