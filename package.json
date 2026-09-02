@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "E-Ticaret Analizleri — Supabase'ten veri çeken, webde yayınlanabilir statik pano",
+  "engines": { "node": ">=22" },
   "scripts": {
     "build:web": "node scripts/build-web.js",
     "import": "node scripts/import.js",
