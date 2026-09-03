@@ -140,7 +140,11 @@ function soapPage(doc) {
     TAMAMINI tek istekte veriyor (ör. 2026-08 → 4035 sipariş). Bu yüzden:
     index kullanmıyoruz; AY AY geriye gidip her ayı tek istekte çekiyoruz.
     Sipariş No ile tekilleştiriyoruz (pencere sınırındaki olası çakışmalar için). */
-async function fetchRows({ days = 30 } = {}) {
+/** Aylık pencerelerle Ticimax siparişlerini çeker.
+    - onBatch verilmezse: hepsini biriktirip { t0, t1 } döndürür (normal topla akışı)
+    - onBatch verilirse: her ayın satırlarını { t0, t1, label } ile callback'e verir,
+      biriktirmez (backfill: doğrudan Supabase'e akıt). */
+async function fetchRows({ days = 30, onBatch = null } = {}) {
   const url = endpoint();
   const kod = apiKey();
   const fullHistory = !days || days <= 0;
@@ -165,6 +169,7 @@ async function fetchRows({ days = 30 } = {}) {
 
   while (winEnd > floor) {
     if (winStart < floor) winStart = new Date(floor);
+    const label = `${isoL(winStart).slice(0, 10)}→${isoL(winEnd).slice(0, 10)}`;
 
     let doc = await soapCall(url, envelope(kod, isoL(winStart), isoL(winEnd), 0, KAYIT));
     let list = soapPage(doc);
@@ -179,11 +184,21 @@ async function fetchRows({ days = 30 } = {}) {
       fresh.push(x);
     }
     list = null;
-    toRowsInto(fresh, t0, t1);   // ham → düz satır, ardından fresh çöpe
-    const yeni = fresh.length;
-    fresh = null;
 
-    log(id, `[${isoL(winStart).slice(0, 10)}→${isoL(winEnd).slice(0, 10)}] ${winLen} kayıt / +${yeni} yeni (sipariş ${t1.length} · kalem ${t0.length})`);
+    let yeni;
+    if (onBatch) {
+      const wt0 = [], wt1 = [];
+      toRowsInto(fresh, wt0, wt1);
+      yeni = wt1.length;
+      fresh = null;
+      await onBatch({ t0: wt0, t1: wt1, label });
+    } else {
+      toRowsInto(fresh, t0, t1);   // ham → düz satır, ardından fresh çöpe
+      yeni = fresh.length;
+      fresh = null;
+    }
+
+    log(id, `[${label}] ${winLen} kayıt / +${yeni} yeni${onBatch ? '' : ` (sipariş ${t1.length} · kalem ${t0.length})`}`);
     if (winLen >= KAYIT) log(id, `⚠ ${isoL(winStart).slice(0, 7)} penceresi ${KAYIT} sınırına dayandı — bölünmesi gerekebilir`);
 
     bosAy = winLen === 0 ? bosAy + 1 : 0;
@@ -279,4 +294,4 @@ async function fetch(opts) {
   return rows;
 }
 
-module.exports = { id, configured, fetch };
+module.exports = { id, configured, fetch, fetchRows };

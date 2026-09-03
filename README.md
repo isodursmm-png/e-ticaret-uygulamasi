@@ -128,6 +128,17 @@ node scripts/topla.js --only=ticimax,trendyol
 node scripts/topla.js --only=yemeksepeti --headed   # ilk giriş / 2FA — oturum scripts/.pw-state/ altına kaydolur
 ```
 
+### Ham arşiv — tek seferlik geçmiş dolumu
+`raw_orders` tablosunu tüm geçmişle bir kez doldurur (pano/`analytics_payload`'a
+dokunmaz). Ticimax ay ay çekilip her ay hemen Supabase'e yazılır — bellekte
+birikmez. Yemeksepeti/Trendyol API'leri zaten ~60 günle sınırlı.
+```bash
+npm run backfill                     # tüm kaynaklar, tüm geçmiş (Ticimax'te ~1 saat)
+node scripts/backfill-raw.js --only=ticimax --from=2024-01
+```
+Sonrasında saatlik `collect` iş akışı güncel pencereyi (`TICIMAX_FETCH_DAYS`, ör.
+90 gün) hem `analytics_payload`'a hem `raw_orders`'a yazmaya devam eder.
+
 ### Otomatik (GitHub Actions) — `.github/workflows/collect.yml`
 - **Saatlik cron** + elle `workflow_dispatch` + panodaki düğmeden `repository_dispatch: refresh`.
 - Repo **Secrets**: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE`, `TICIMAX_API_KEY`,
