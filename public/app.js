@@ -230,6 +230,17 @@ function lineC(cats, series, {fmt=F.n, catFmt=(x=>x), area=false}={}){
     s+=`<circle cx="${last[0]}" cy="${last[1]}" r="4" fill="${se.color}" stroke="${PAL['--surface']}" stroke-width="1.5"/>`;
     s+=`<text x="${last[0]-6}" y="${last[1]-8}" text-anchor="end" font-size="11" font-weight="600" fill="${se.color}">${esc(fmt(se.values[se.values.length-1]))}</text>`;
   });
+  // ay çizgilerinin üzerine o ayki gerçek (kısaltmasız) değeri yaz — tek seri
+  if(monthMode && series.length===1){
+    const se=series[0];
+    tickIdx.forEach(i=>{
+      if(i===0 || i>=cats.length-1) return;                 // 0 ve son nokta zaten yazılı
+      const v=se.values[i]; if(!(v>0)) return;
+      const x=xAt(i), y=yAt(v);
+      s+=`<circle cx="${x}" cy="${y}" r="2.8" fill="${se.color}" stroke="${PAL['--surface']}" stroke-width="1"/>`;
+      s+=`<text x="${x+5}" y="${y-7}" text-anchor="start" font-size="10.5" font-weight="700" fill="${se.color}">${esc(fmt(v))}</text>`;
+    });
+  }
   s+=`<line id="xh" x1="0" x2="0" y1="${padT}" y2="${padT+ih}" stroke="${PAL['--hair-strong']}" opacity="0"/>`;
   cats.forEach((c,i)=>{
     const rows=series.map(se=>`<div><span class='sw' style='background:${se.color}'></span>${esc(se.name)}: <b>${esc(fmt(se.values[i]))}</b></div>`).join('');
