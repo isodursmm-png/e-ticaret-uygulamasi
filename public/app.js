@@ -170,8 +170,14 @@ function barV(cats, series, {fmt=F.n, stacked=true, catFmt=(x=>x), note=null, va
     if(stacked){
       series.forEach(se=>{ const v=se.values[ci]||0; if(v<=0) return; const h=(v/max)*ih, y=yT(acc+v); acc+=v;
         s+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${Math.max(0,h-1.5)}" fill="${se.color}" rx="2"/>`;
-        if(values && h>=13) s+=`<text x="${cx}" y="${y+h/2+3.5}" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">${esc(fmt(v))}</text>`; });
-      if(values && acc>0) s+=`<text x="${cx}" y="${yT(acc)-4}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${PAL['--ink']}">${esc(fmt(acc))}</text>`;
+        if(values===true && h>=13) s+=`<text x="${cx}" y="${y+h/2+3.5}" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">${esc(fmt(v))}</text>`; });
+      if(values==='v' && acc>0){
+        const bh=(acc/max)*ih, inside=bh>=64;
+        const ty=inside ? yT(acc)+7 : yT(acc)-7;
+        s+=`<text x="${cx}" y="${ty}" text-anchor="${inside?'start':'end'}" transform="rotate(-90 ${cx} ${ty})" `+
+           `font-size="10.5" font-weight="800" fill="${inside?'#fff':PAL['--ink']}" `+
+           `paint-order="stroke" stroke="${inside?'rgba(0,0,0,.4)':PAL['--surface']}" stroke-width="${inside?2.6:3}">${esc(fmt(acc))}</text>`;
+      } else if(values===true && acc>0) s+=`<text x="${cx}" y="${yT(acc)-4}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${PAL['--ink']}">${esc(fmt(acc))}</text>`;
     } else {
       const n=series.length, sw=bw/n;
       series.forEach((se,si)=>{ const v=se.values[ci]||0, h=(v/max)*ih, y=yT(v), bx2=cx-bw/2+sw*si;
@@ -837,7 +843,7 @@ RENDERERS.ciro=(v)=>{
   g.appendChild(panel('Sepet tutarı dağılımı','Teslim edilen sipariş sayısı',
     histo(D.map(o=>o.ciro),[0,150,300,500,750,1000,1500,2500],F.tl)));
   g.appendChild(panel('Aylık ciro','Veri: '+F.d(PL.meta.minDate)+' – '+F.d(PL.meta.maxDate),
-    barV([...new Set(D.map(o=>o.mon))].sort(),seriesByCh(D,[...new Set(D.map(o=>o.mon))].sort(),'mon',o=>o.ciro),{fmt:F.tlk,catFmt:F.mon})));
+    barV([...new Set(D.map(o=>o.mon))].sort(),seriesByCh(D,[...new Set(D.map(o=>o.mon))].sort(),'mon',o=>o.ciro),{fmt:F.tl,catFmt:F.mon,values:'v'})));
 };
 
 RENDERERS.siparis=(v)=>{
