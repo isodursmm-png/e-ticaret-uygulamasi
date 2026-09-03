@@ -191,7 +191,15 @@ function lineC(cats, series, {fmt=F.n, catFmt=(x=>x), area=false}={}){
   for(let g=0; g<=4; g++){ const v=max*g/4, y=yAt(v);
     s+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="${PAL['--hair']}"/>`;
     s+=`<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="${PAL['--ink-2']}">${esc(fmt(v))}</text>`; }
-  cats.forEach((c,i)=> s+=`<text x="${xAt(i)}" y="${H-padB+16}" text-anchor="middle" font-size="10.5" fill="${PAL['--muted']}">${esc(catFmt(c))}</text>`);
+  // x ekseni: çok sayıda gün varsa yalnızca ay başlarını "Ay YYYY" olarak etiketle
+  const dayLike = cats.length>0 && /^\d{4}-\d{2}-\d{2}$/.test(String(cats[0]));
+  const monthMode = dayLike && cats.length>24;
+  const tickIdx = monthMode
+    ? cats.map((c,i)=> (i===0 || String(c).slice(0,7)!==String(cats[i-1]).slice(0,7)) ? i : -1).filter(i=>i>=0)
+    : cats.map((_,i)=>i);
+  const tickFmt = monthMode ? (c=>F.mon(c)) : catFmt;
+  tickIdx.forEach(i=> s+=`<text x="${xAt(i)}" y="${H-padB+16}" text-anchor="${monthMode?'start':'middle'}" font-size="10.5" fill="${PAL['--muted']}">${esc(tickFmt(cats[i]))}</text>`);
+  if(monthMode) tickIdx.forEach(i=> s+=`<line x1="${xAt(i)}" x2="${xAt(i)}" y1="${padT}" y2="${padT+ih}" stroke="${PAL['--hair']}" opacity=".6"/>`);
   series.forEach(se=>{
     const pts=se.values.map((v,i)=>[xAt(i),yAt(v)]);
     if(area && series.length===1)
@@ -667,27 +675,51 @@ function syncBrandSrc(){
   });
 }
 
+/** Bir yılın haftaları (Pazartesi başlangıçlı, 52–53). Yıla taşan uçlar dahil. */
+function _weeksOf(y){
+  const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const jan1=new Date(y,0,1);
+  const mon=new Date(jan1); mon.setDate(jan1.getDate()-((jan1.getDay()+6)%7));
+  const out=[];
+  for(let n=1;n<=53;n++){
+    const f=new Date(mon), t=new Date(mon); t.setDate(mon.getDate()+6);
+    if(f.getFullYear()>y) break;
+    out.push({ n, from:iso(f), to:iso(t) });
+    if(t.getFullYear()>y) break;
+    mon.setDate(mon.getDate()+7);
+  }
+  return out;
+}
+const _dm = s => s.slice(8)+'.'+s.slice(5,7);   // "YYYY-MM-DD" -> "DD.MM"
+
 function renderDateBar(){
   const host=document.getElementById('dr'); if(!host) return;
-  const wk = { from:_clampD(_addDays(PL.meta.maxDate,-6)), to:PL.meta.maxDate };
   const mo = { from:_clampD(PL.meta.maxDate.slice(0,7)+'-01'), to:_clampD(_lastDom(PL.meta.maxDate.slice(0,7))) };
   const isR = r => S.from===r.from && S.to===r.to;
   const full = fullRange();
-  // Veride bulunan yıllar (yeni → eski) — her rapor başlığından yıl süzme
   const yr = y => ({ from:_clampD(y+'-01-01'), to:_clampD(y+'-12-31') });
   const years=[]; for(let y=+PL.meta.maxDate.slice(0,4); y>=+PL.meta.minDate.slice(0,4); y--) years.push(y);
   const curYear = years.find(y=>isR(yr(y)));
   const isYear = curYear!=null;
-  const wasOpen = !!(host.querySelector('.dr-inputs.open')) || (!full && !isYear);
+  // Hafta planı: seçili yılın (yoksa en güncel yılın) 52–53 haftası
+  const weekYear = curYear || +PL.meta.maxDate.slice(0,4);
+  const weeks = _weeksOf(weekYear);
+  const curWeek = weeks.find(w=>isR({from:_clampD(w.from),to:_clampD(w.to)}));
+  const isWeek = curWeek!=null;
+  const isMonth = !full && isR(mo);
+  const wasOpen = !!(host.querySelector('.dr-inputs.open')) || (!full && !isYear && !isWeek && !isMonth);
   host.innerHTML =
     `<span class="drlbl">Dönem</span>`+
-    `<button class="dr-btn dr-ay${!full&&isR(mo)?' on':''}" data-a="ay">📅 Ay</button>`+
-    `<button class="dr-btn dr-hf${!full&&isR(wk)?' on':''}" data-a="hf">🗓️ Hafta</button>`+
     `<select class="dr-sel${isYear?' on':''}" id="drYear" title="Yıla göre süz">`+
       `<option value="">📅 Yıl</option>`+
       years.map(y=>`<option value="${y}"${curYear===y?' selected':''}>${y}</option>`).join('')+
     `</select>`+
-    `<button class="dr-btn dr-ta${!full&&!isR(mo)&&!isR(wk)&&!isYear?' on':''}" data-a="ta">📆 Tarih aralığı</button>`+
+    `<button class="dr-btn dr-ay${isMonth?' on':''}" data-a="ay">📅 Ay</button>`+
+    `<select class="dr-sel dr-wk${isWeek?' on':''}" id="drWeek" title="Haftaya göre süz (${weekYear})">`+
+      `<option value="">🗓️ Hafta</option>`+
+      weeks.map(w=>`<option value="${w.n}"${curWeek&&curWeek.n===w.n?' selected':''}>H${w.n} · ${_dm(w.from)}–${_dm(w.to)}</option>`).join('')+
+    `</select>`+
+    `<button class="dr-btn dr-ta${!full&&!isMonth&&!isWeek&&!isYear?' on':''}" data-a="ta">📆 Tarih aralığı</button>`+
     `<button class="dr-btn dr-all${full?' on':''}" data-a="all">∞ Tümü</button>`+
     `<button class="dr-btn dr-nav" data-nav="-1" title="Önceki dönem"${full?' disabled':''}>‹</button>`+
     `<button class="dr-btn dr-nav" data-nav="1" title="Sonraki dönem"${full?' disabled':''}>›</button>`+
@@ -697,8 +729,8 @@ function renderDateBar(){
       `<input type="date" id="drTo" min="${PL.meta.minDate}" max="${PL.meta.maxDate}" value="${S.to}"></span>`;
   const go = () => { buildFilters(); render(); };
   host.querySelector('[data-a="ay"]').onclick = () => { S.from=mo.from; S.to=mo.to; go(); };
-  host.querySelector('[data-a="hf"]').onclick = () => { S.from=wk.from; S.to=wk.to; go(); };
   host.querySelector('#drYear').onchange = e => { const y=+e.target.value; if(!y) return; const r=yr(y); S.from=r.from; S.to=r.to; go(); };
+  host.querySelector('#drWeek').onchange = e => { const w=weeks.find(x=>x.n===+e.target.value); if(!w) return; S.from=_clampD(w.from); S.to=_clampD(w.to); go(); };
   host.querySelector('[data-a="all"]').onclick = () => { S.from=PL.meta.minDate; S.to=PL.meta.maxDate; go(); };
   host.querySelector('[data-a="ta"]').onclick = () => document.getElementById('drIn').classList.toggle('open');
   host.querySelectorAll('[data-nav]').forEach(b=>b.onclick = () => shiftRange(+b.dataset.nav));
@@ -741,7 +773,7 @@ RENDERERS.genel=(v)=>{
   let acc=0; const cum=cats.map(d=>{ acc+=sum(D.filter(o=>o.ds===d),o=>o.ciro); return acc; });
   const g=document.createElement('div'); g.className='grid g2'; v.appendChild(g);
   g.appendChild(panel('Kümülatif ciro','Gün gün biriken teslim cirosu',
-    lineC(cats,[{name:'Kümülatif',color:PAL['--accent'],values:cum}],{fmt:F.tlk,catFmt:F.d,area:true})));
+    lineC(cats,[{name:'Kümülatif',color:PAL['--accent'],values:cum}],{fmt:F.tl,catFmt:F.d,area:true})));
   g.appendChild(panel('Günlük ciro','Kanal kırılımı, teslim edilen',
     barV(cats, seriesByCh(D,cats,'ds',o=>o.ciro),{fmt:F.tlk,catFmt:F.d})));
   const g2=document.createElement('div'); g2.className='grid g3'; v.appendChild(g2);
@@ -761,8 +793,8 @@ RENDERERS.ciro=(v)=>{
   let acc=0; const cum=cats.map(d=>{ acc+=sum(D.filter(o=>o.ds===d),o=>o.ciro); return acc; });
   const cumCh=CH.filter(c=>S.ch.has(c)).map(c=>{ let a=0; return {name:c,color:CV(CH_COL[c]),values:cats.map(d=>{ a+=sum(D.filter(o=>o.ds===d&&o.ch===c),o=>o.ciro); return a; })}; });
   v.appendChild(panel('Kümülatif ciro — toplam','Biriken teslim cirosu',
-    lineC(cats,[{name:'Toplam',color:PAL['--accent'],values:cum}],{fmt:F.tlk,catFmt:F.d,area:true})));
-  v.appendChild(panel('Kümülatif ciro — kanal bazlı',null, lineC(cats,cumCh,{fmt:F.tlk,catFmt:F.d})));
+    lineC(cats,[{name:'Toplam',color:PAL['--accent'],values:cum}],{fmt:F.tl,catFmt:F.d,area:true})));
+  v.appendChild(panel('Kümülatif ciro — kanal bazlı',null, lineC(cats,cumCh,{fmt:F.tl,catFmt:F.d})));
   const g=document.createElement('div'); g.className='grid g2'; v.appendChild(g);
   g.appendChild(panel('Günlük ciro','Kanal kırılımı', barV(cats,seriesByCh(D,cats,'ds',o=>o.ciro),{fmt:F.tlk,catFmt:F.d})));
   g.appendChild(panel('Haftanın gününe göre ciro',null,(()=>{
