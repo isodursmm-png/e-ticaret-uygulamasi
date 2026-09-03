@@ -142,10 +142,20 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
 
   console.log(`\n✓ Supabase güncellendi — ${P.meta.orders} sipariş · ${P.meta.items} kalem · ${P.meta.minDate} – ${P.meta.maxDate}`);
 
+  // Ham arşiv yazımı tamamlayıcıdır: başarısız olsa bile pano (analytics_payload)
+  // güncel kaldığından koşuyu düşürmeyiz — sadece uyarırız.
   let rawWritten = 0;
   if (rawRows.length) {
-    rawWritten = await pushRaw(sb, rawRows);
-    console.log(`✓ raw_orders — ${rawWritten} ham satır yazıldı/güncellendi (yeni gelenler eklendi)`);
+    try {
+      rawWritten = await pushRaw(sb, rawRows);
+      console.log(`✓ raw_orders — ${rawWritten} ham satır yazıldı/güncellendi (yeni gelenler eklendi)`);
+    } catch (e) {
+      const hint = /relation .*raw_orders.* does not exist|Could not find the table/i.test(e.message)
+        ? ' — supabase/schema.sql (raw_orders bloğu) çalıştırılmamış olabilir'
+        : '';
+      console.warn(`⚠ raw_orders atlandı: ${e.message}${hint}`);
+      errors.push(`raw_orders: ${e.message}`);
+    }
   }
 
   return { ok: true, meta: P.meta, summary: sum, rawWritten, ran, skipped, errors };

@@ -66,7 +66,7 @@ async function pushRaw(sb, rows, { chunk = 500 } = {}) {
     const part = rows.slice(i, i + chunk);
     const { error } = await sb
       .from('raw_orders')
-      .upsert(part, { onConflict: 'key', ignoreDuplicates: false, defaultToNull: false });
+      .upsert(part, { onConflict: 'key', ignoreDuplicates: false });
     if (error) throw new Error('raw_orders upsert: ' + error.message);
     n += part.length;
   }
