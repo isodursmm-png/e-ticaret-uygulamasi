@@ -96,6 +96,25 @@ function loadGeo() {
   catch (e) { console.warn('geo okunamadı, atlanıyor:', e.message); return null; }
 }
 
+/** Geçici hatalarda (5xx / Cloudflare 520 / ağ / timeout) artan beklemeyle tekrar dene. */
+async function withRetry(label, fn, tries = 4) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); }
+    catch (e) {
+      last = e;
+      const m = String((e && e.message) || e);
+      const transient = /\b5\d\d\b|timeout|ETIMEDOUT|ECONNRESET|EAI_AGAIN|fetch failed|socket hang up|network|cloudflare|unknown error/i.test(m);
+      if (i < tries - 1 && transient) {
+        const wait = 4000 * (i + 1);
+        console.warn(`  ↻ ${label}: ${m.slice(0, 140)} — ${wait / 1000}sn sonra tekrar (${i + 2}/${tries})`);
+        await new Promise((r) => setTimeout(r, wait));
+      } else break;
+    }
+  }
+  throw last;
+}
+
 /** RAW_ORDERS=0 (env) veya --no-raw (CLI) ile ham arşiv yazımı kapatılır. */
 function rawEnabled(raw) {
   if (raw === false) return false;
@@ -118,6 +137,13 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
   const sum = summary(P);
   console.log('\nözet:', JSON.stringify(sum, null, 1));
 
+  const payloadMB = Buffer.byteLength(JSON.stringify(P)) / 1048576;
+  console.log(`payload: ${payloadMB.toFixed(1)} MB (${P.meta.orders} sipariş · ${P.meta.items} kalem)`);
+  if (payloadMB > 40) {
+    console.warn(`⚠ payload ${payloadMB.toFixed(0)} MB — Supabase/Cloudflare üst sınırına yakın. ` +
+      `TICIMAX_FETCH_DAYS (veya FETCH_DAYS) değerini düşür.`);
+  }
+
   const rawRows = rawEnabled(raw) ? toRawRows(merged) : [];
 
   if (dryRun) {
@@ -131,14 +157,16 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
   }
 
   const sb = createClient(URL, KEY, { auth: { persistSession: false } });
-  const { error } = await sb.from('analytics_payload').upsert({
-    id: 'eticaret',
-    data: P,
-    geo: loadGeo(),
-    meta: P.meta,
-    updated_at: new Date().toISOString()
+  await withRetry('analytics_payload upsert', async () => {
+    const { error } = await sb.from('analytics_payload').upsert({
+      id: 'eticaret',
+      data: P,
+      geo: loadGeo(),
+      meta: P.meta,
+      updated_at: new Date().toISOString()
+    });
+    if (error) throw new Error('Supabase upsert: ' + (error.message || JSON.stringify(error)).slice(0, 300));
   });
-  if (error) throw new Error('Supabase upsert: ' + error.message);
 
   console.log(`\n✓ Supabase güncellendi — ${P.meta.orders} sipariş · ${P.meta.items} kalem · ${P.meta.minDate} – ${P.meta.maxDate}`);
 
@@ -147,7 +175,7 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
   let rawWritten = 0;
   if (rawRows.length) {
     try {
-      rawWritten = await pushRaw(sb, rawRows);
+      rawWritten = await withRetry('raw_orders upsert', () => pushRaw(sb, rawRows));
       console.log(`✓ raw_orders — ${rawWritten} ham satır yazıldı/güncellendi (yeni gelenler eklendi)`);
     } catch (e) {
       const hint = /relation .*raw_orders.* does not exist|Could not find the table/i.test(e.message)
