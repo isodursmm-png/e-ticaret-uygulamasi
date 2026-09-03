@@ -23,10 +23,10 @@ const BUCKETS = {
     (kaynaklar tüm pencereyi yeniden çektiği için koşular arası kararlı/idempotent). */
 function toRawRows(merged = {}) {
   const now = new Date().toISOString();
-  const rows = [];
+  const byKey = new Map();       // key -> satır (tek upsert'te key tekrarı yasak)
   for (const [bucket, cfg] of Object.entries(BUCKETS)) {
     const list = Array.isArray(merged[bucket]) ? merged[bucket] : [];
-    const lineIdx = new Map(); // sipariş no -> sıradaki kalem indexi
+    const lineIdx = new Map();   // sipariş no -> sıradaki kalem indexi
     for (const r of list) {
       const orderNo = String(r[cfg.no] == null ? '' : r[cfg.no]).trim();
       if (!orderNo) continue;
@@ -42,8 +42,12 @@ function toRawRows(merged = {}) {
       } else {
         key = `${cfg.source}:${bucket}:${orderNo}`;
       }
+      // Aynı key tekrar geldiyse (ör. Yemeksepeti aynı siparişi birden çok
+      // şubeden döndürüyor) sonek ekle — veri kaybetme, ama tek upsert
+      // deyiminde çakışma da olmasın.
+      while (byKey.has(key)) key += '~';
 
-      rows.push({
+      byKey.set(key, {
         key,
         source: cfg.source,
         bucket,
@@ -56,7 +60,7 @@ function toRawRows(merged = {}) {
       });
     }
   }
-  return rows;
+  return [...byKey.values()];
 }
 
 /** raw_orders'a parça parça upsert (onConflict: key). first_seen'e dokunmaz. */

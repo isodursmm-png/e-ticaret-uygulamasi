@@ -201,7 +201,8 @@ async function fetchRows({ days = 30, onBatch = null } = {}) {
     log(id, `[${label}] ${winLen} kayıt / +${yeni} yeni${onBatch ? '' : ` (sipariş ${t1.length} · kalem ${t0.length})`}`);
     if (winLen >= KAYIT) log(id, `⚠ ${isoL(winStart).slice(0, 7)} penceresi ${KAYIT} sınırına dayandı — bölünmesi gerekebilir`);
 
-    bosAy = winLen === 0 ? bosAy + 1 : 0;
+    // Servis, boş pencerede 0 yerine 1 "hayalet" kayıt döndürebiliyor → <=1 boş say.
+    bosAy = winLen <= 1 ? bosAy + 1 : 0;
     if (fullHistory && bosAy >= BOS_AY_DUR) { log(id, `${BOS_AY_DUR} ardışık boş ay — durduruldu`); break; }
 
     winEnd = winStart;
