@@ -11,6 +11,33 @@ const CH_COL = { Ticimax:'--s1', Yemeksepeti:'--s2', Trendyol:'--s3' };
 const MONTHS_TR = {'01':'Oca','02':'Şub','03':'Mar','04':'Nis','05':'May','06':'Haz','07':'Tem','08':'Ağu','09':'Eyl','10':'Eki','11':'Kas','12':'Ara'};
 const WEEK = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
 
+/* Yemeksepeti / Delivery Hero iptal sebebi kodları → Türkçe */
+const CANCEL_TR = {
+  ITEM_UNAVAILABLE:'Ürün stokta yok', ITEM_NOT_AVAILABLE:'Ürün stokta yok',
+  FRAUD_PRANK:'Sahte / şaka sipariş', FRAUD:'Sahte sipariş',
+  UNABLE_TO_PAY:'Ödeme yapılamadı', PAYMENT_FAILED:'Ödeme başarısız',
+  CLOSED:'Mağaza kapalı', VENDOR_CLOSED:'Mağaza kapalı', RESTAURANT_CLOSED:'Mağaza kapalı',
+  TOO_BUSY:'Yoğunluk', VENDOR_BUSY:'Yoğunluk',
+  UNABLE_TO_FIND:'Adres bulunamadı', ADDRESS_NOT_FOUND:'Adres bulunamadı', ADDRESS_INCOMPLETE:'Adres eksik',
+  WRONG_ORDER_ITEMS_DELIVERED:'Yanlış ürün teslim edildi', WRONG_ITEMS:'Yanlış ürün',
+  MISTAKE_ERROR:'Hatalı sipariş', ORDER_ERROR:'Sipariş hatası',
+  NEVER_DELIVERED:'Teslim edilemedi', DELIVERY_FAILED:'Teslim edilemedi', LATE_DELIVERY:'Geç teslimat',
+  ORDER_MODIFICATION_NOT_POSSIBLE:'Sipariş değişikliği yapılamadı',
+  CUSTOMER_CALLED_TO_CANCEL:'Müşteri iptal etti', CUSTOMER_CANCELLED:'Müşteri iptal etti',
+  CUSTOMER_UNREACHABLE:'Müşteriye ulaşılamadı', CUSTOMER_NOT_AVAILABLE:'Müşteri adreste yok',
+  DUPLICATE_ORDER:'Mükerrer sipariş', TECHNICAL_PROBLEM:'Teknik sorun',
+  OUT_OF_DELIVERY_AREA:'Teslimat bölgesi dışı', NO_COURIER_AVAILABLE:'Kurye bulunamadı',
+  NO_COURIER:'Kurye bulunamadı', PRICE_MISMATCH:'Fiyat uyuşmazlığı', WRONG_PRICE:'Fiyat hatası',
+  OTHER:'Diğer', UNKNOWN:'Bilinmiyor'
+};
+const crTR = s => {
+  if(s==null || s==='') return 'Belirtilmemiş';
+  const k=String(s).trim();
+  if(CANCEL_TR[k.toUpperCase()]) return CANCEL_TR[k.toUpperCase()];
+  if(/^[A-Z0-9_]+$/.test(k)) return k.toLowerCase().replace(/_/g,' ').replace(/(^|\s)\S/g,c=>c.toUpperCase());
+  return k;
+};
+
 /* ---------- biçimlendirme ---------- */
 const nf = new Intl.NumberFormat('tr-TR');
 const F = {
@@ -941,7 +968,7 @@ RENDERERS.teslimat=(v)=>{
     return topEntries(m,12).length? barH(topEntries(m,12).map(([k,vv])=>({label:String(k).replace(/ Arası( Teslimat)?/,''),value:vv,color:PAL['--s1']})),{fmt:F.n}) : miss();
   })()));
   g.appendChild(panel('İptal sebepleri (Yemeksepeti)',null,(()=>{
-    const e=topEntries(groupSum(O.filter(o=>o.cr),o=>o.cr,()=>1),10);
+    const e=topEntries(groupSum(O.filter(o=>o.cr),o=>crTR(o.cr),()=>1),10);
     return e.length? barH(e.map(([k,vv])=>({label:k,value:vv,color:PAL['--crit']})),{fmt:F.n}) : miss();
   })()));
 };

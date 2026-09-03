@@ -51,6 +51,31 @@ const STATUS_TR = {
   CANCELLED: 'İptal Edildi', DELIVERED: 'Teslim Edildi'
 };
 
+const CANCEL_TR = {
+  ITEM_UNAVAILABLE: 'Ürün stokta yok', ITEM_NOT_AVAILABLE: 'Ürün stokta yok',
+  FRAUD_PRANK: 'Sahte / şaka sipariş', FRAUD: 'Sahte sipariş',
+  UNABLE_TO_PAY: 'Ödeme yapılamadı', PAYMENT_FAILED: 'Ödeme başarısız',
+  CLOSED: 'Mağaza kapalı', VENDOR_CLOSED: 'Mağaza kapalı', RESTAURANT_CLOSED: 'Mağaza kapalı',
+  TOO_BUSY: 'Yoğunluk', VENDOR_BUSY: 'Yoğunluk',
+  UNABLE_TO_FIND: 'Adres bulunamadı', ADDRESS_NOT_FOUND: 'Adres bulunamadı', ADDRESS_INCOMPLETE: 'Adres eksik',
+  WRONG_ORDER_ITEMS_DELIVERED: 'Yanlış ürün teslim edildi', WRONG_ITEMS: 'Yanlış ürün',
+  MISTAKE_ERROR: 'Hatalı sipariş', ORDER_ERROR: 'Sipariş hatası',
+  NEVER_DELIVERED: 'Teslim edilemedi', DELIVERY_FAILED: 'Teslim edilemedi', LATE_DELIVERY: 'Geç teslimat',
+  ORDER_MODIFICATION_NOT_POSSIBLE: 'Sipariş değişikliği yapılamadı',
+  CUSTOMER_CALLED_TO_CANCEL: 'Müşteri iptal etti', CUSTOMER_CANCELLED: 'Müşteri iptal etti',
+  CUSTOMER_UNREACHABLE: 'Müşteriye ulaşılamadı', CUSTOMER_NOT_AVAILABLE: 'Müşteri adreste yok',
+  DUPLICATE_ORDER: 'Mükerrer sipariş', TECHNICAL_PROBLEM: 'Teknik sorun',
+  OUT_OF_DELIVERY_AREA: 'Teslimat bölgesi dışı', NO_COURIER_AVAILABLE: 'Kurye bulunamadı', NO_COURIER: 'Kurye bulunamadı',
+  PRICE_MISMATCH: 'Fiyat uyuşmazlığı', WRONG_PRICE: 'Fiyat hatası', OTHER: 'Diğer', UNKNOWN: 'Bilinmiyor'
+};
+function cancelTR(s) {
+  if (s == null || s === '') return '';
+  const k = String(s).trim();
+  if (CANCEL_TR[k.toUpperCase()]) return CANCEL_TR[k.toUpperCase()];
+  if (/^[A-Z0-9_]+$/.test(k)) return k.toLowerCase().replace(/_/g, ' ').replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+  return k;
+}
+
 async function jfetch(url, opts, tries = 3) {
   let last;
   for (let i = 0; i < tries; i++) {
@@ -164,7 +189,7 @@ function toRows(orders) {
       'Tahmini Kazanç': 0,
       'Ürünler': urunler,
       'Sipariş Durumu': STATUS_TR[o.status] || o.status || 'Diğer',
-      'İptal Sebebi': (o.cancellation && o.cancellation.reason) || ''
+      'İptal Sebebi': cancelTR(o.cancellation && o.cancellation.reason)
     });
   }
   return { ys };
