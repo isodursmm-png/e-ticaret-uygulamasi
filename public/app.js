@@ -734,19 +734,21 @@ const _dm = s => s.slice(8)+'.'+s.slice(5,7);   // "YYYY-MM-DD" -> "DD.MM"
 
 function renderDateBar(){
   const host=document.getElementById('dr'); if(!host) return;
-  const mo = { from:_clampD(PL.meta.maxDate.slice(0,7)+'-01'), to:_clampD(_lastDom(PL.meta.maxDate.slice(0,7))) };
   const isR = r => S.from===r.from && S.to===r.to;
   const full = fullRange();
   const yr = y => ({ from:_clampD(y+'-01-01'), to:_clampD(y+'-12-31') });
   const years=[]; for(let y=+PL.meta.maxDate.slice(0,4); y>=+PL.meta.minDate.slice(0,4); y--) years.push(y);
   const curYear = years.find(y=>isR(yr(y)));
   const isYear = curYear!=null;
-  // Hafta planı: seçili yılın (yoksa en güncel yılın) 52–53 haftası
-  const weekYear = curYear || +PL.meta.maxDate.slice(0,4);
-  const weeks = _weeksOf(weekYear);
+  // Ay/Hafta planı: seçili yılın (yoksa en güncel yılın) ayları/haftaları
+  const planYear = curYear || +PL.meta.maxDate.slice(0,4);
+  const moRange = ym => ({ from:_clampD(ym+'-01'), to:_clampD(_lastDom(ym)) });
+  const months=[]; for(let m=1;m<=12;m++) months.push(planYear+'-'+String(m).padStart(2,'0'));
+  const curMonth = months.find(ym=>isR(moRange(ym)));
+  const isMonth = curMonth!=null;
+  const weeks = _weeksOf(planYear);
   const curWeek = weeks.find(w=>isR({from:_clampD(w.from),to:_clampD(w.to)}));
   const isWeek = curWeek!=null;
-  const isMonth = !full && isR(mo);
   const wasOpen = !!(host.querySelector('.dr-inputs.open')) || (!full && !isYear && !isWeek && !isMonth);
   host.innerHTML =
     `<span class="drlbl">Dönem</span>`+
@@ -754,8 +756,11 @@ function renderDateBar(){
       `<option value="">📅 Yıl</option>`+
       years.map(y=>`<option value="${y}"${curYear===y?' selected':''}>${y}</option>`).join('')+
     `</select>`+
-    `<button class="dr-btn dr-ay${isMonth?' on':''}" data-a="ay">📅 Ay</button>`+
-    `<select class="dr-sel dr-wk${isWeek?' on':''}" id="drWeek" title="Haftaya göre süz (${weekYear})">`+
+    `<select class="dr-sel dr-mo${isMonth?' on':''}" id="drMonth" title="Aya göre süz (${planYear})">`+
+      `<option value="">📅 Ay</option>`+
+      months.map(ym=>`<option value="${ym}"${curMonth===ym?' selected':''}>${F.mon(ym)}</option>`).join('')+
+    `</select>`+
+    `<select class="dr-sel dr-wk${isWeek?' on':''}" id="drWeek" title="Haftaya göre süz (${planYear})">`+
       `<option value="">🗓️ Hafta</option>`+
       weeks.map(w=>`<option value="${w.n}"${curWeek&&curWeek.n===w.n?' selected':''}>H${w.n} · ${_dm(w.from)}–${_dm(w.to)}</option>`).join('')+
     `</select>`+
@@ -768,8 +773,8 @@ function renderDateBar(){
       `<span>–</span>`+
       `<input type="date" id="drTo" min="${PL.meta.minDate}" max="${PL.meta.maxDate}" value="${S.to}"></span>`;
   const go = () => { buildFilters(); render(); };
-  host.querySelector('[data-a="ay"]').onclick = () => { S.from=mo.from; S.to=mo.to; go(); };
   host.querySelector('#drYear').onchange = e => { const y=+e.target.value; if(!y) return; const r=yr(y); S.from=r.from; S.to=r.to; go(); };
+  host.querySelector('#drMonth').onchange = e => { const ym=e.target.value; if(!ym) return; const r=moRange(ym); S.from=r.from; S.to=r.to; go(); };
   host.querySelector('#drWeek').onchange = e => { const w=weeks.find(x=>x.n===+e.target.value); if(!w) return; S.from=_clampD(w.from); S.to=_clampD(w.to); go(); };
   host.querySelector('[data-a="all"]').onclick = () => { S.from=PL.meta.minDate; S.to=PL.meta.maxDate; go(); };
   host.querySelector('[data-a="ta"]').onclick = () => document.getElementById('drIn').classList.toggle('open');
