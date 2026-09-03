@@ -69,12 +69,14 @@ button{font:inherit; cursor:pointer}
 /* ============ İSKELET ============ */
 .app{display:grid; grid-template-columns:250px 1fr; min-height:100vh}
 
-.side{position:sticky; top:0; height:100vh; overflow-y:auto; background:var(--panel);
-  border-right:1px solid var(--panel-line); display:flex; flex-direction:column}
-.brand{padding:20px 20px 16px; border-bottom:1px solid var(--panel-line)}
+.side{position:sticky; top:0; height:100vh; overflow-y:auto;
+  background:color-mix(in srgb, var(--good) 12%, var(--panel));
+  border-right:4px solid var(--good); display:flex; flex-direction:column}
+.brand{padding:20px 20px 16px; border-bottom:1px solid color-mix(in srgb, var(--good) 35%, var(--panel-line));
+  background:color-mix(in srgb, var(--good) 18%, var(--panel))}
 .brand .mark{display:flex; align-items:center; gap:10px}
-.brand .dot{width:26px; height:26px; border-radius:7px; background:var(--accent);
-  display:grid; place-items:center; color:var(--accent-ink); font-family:"Archivo"; font-weight:700; font-size:15px; flex:none}
+.brand .dot{width:26px; height:26px; border-radius:7px; background:var(--good);
+  display:grid; place-items:center; color:#fff; font-family:"Archivo"; font-weight:700; font-size:15px; flex:none}
 .brand h1{font-size:15px; font-weight:700; line-height:1.15}
 .brand p{font-size:11.5px; color:var(--muted); margin-top:3px; letter-spacing:.02em}
 .brand-src{display:flex; flex-wrap:wrap; gap:5px; margin-top:10px}
