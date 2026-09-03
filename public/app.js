@@ -714,6 +714,25 @@ function render(){
   renderChips();
   renderDateBar();
   syncBrandSrc();
+  requestAnimationFrame(enableTopScrollbars);
+}
+
+/* Geniş tablolara üstte de yatay kaydırma çubuğu (alttakiyle senkron) */
+function enableTopScrollbars(){
+  document.querySelectorAll('#view .tbl-scroll').forEach(sc=>{
+    const prev=sc.previousElementSibling;
+    if(prev && prev.classList.contains('tbl-scroll-top')) prev.remove();
+    const tbl=sc.querySelector('table'); if(!tbl) return;
+    if(tbl.scrollWidth <= sc.clientWidth+4) return;         // taşma yoksa gerek yok
+    const top=document.createElement('div'); top.className='tbl-scroll-top';
+    const inner=document.createElement('div'); inner.className='tbl-scroll-top-inner';
+    inner.style.width=tbl.scrollWidth+'px';
+    top.appendChild(inner);
+    sc.parentNode.insertBefore(top, sc);
+    let lock=false;
+    top.addEventListener('scroll',()=>{ if(lock)return; lock=true; sc.scrollLeft=top.scrollLeft; lock=false; });
+    sc.addEventListener('scroll',()=>{ if(lock)return; lock=true; top.scrollLeft=sc.scrollLeft; lock=false; });
+  });
 }
 
 function syncBrandSrc(){

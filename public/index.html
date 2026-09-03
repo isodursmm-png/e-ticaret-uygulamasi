@@ -226,6 +226,11 @@ button{font:inherit; cursor:pointer}
 
 /* tablo */
 .tbl-scroll{overflow:auto; max-height:70vh; margin-top:6px}
+.tbl-scroll-top{overflow-x:auto; overflow-y:hidden; margin-top:6px}
+.tbl-scroll-top-inner{height:1px}
+.tbl-scroll-top::-webkit-scrollbar{height:11px}
+.tbl-scroll-top::-webkit-scrollbar-thumb{background:var(--panel-h); border-radius:6px}
+.tbl-scroll-top::-webkit-scrollbar-track{background:var(--surface-2)}
 table.dt{border-collapse:collapse; width:100%; font-size:12.5px}
 table.dt th,table.dt td{padding:7px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--hair)}
 table.dt th:first-child,table.dt td:first-child{text-align:left; position:sticky; left:0; background:var(--panel)}
