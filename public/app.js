@@ -132,6 +132,27 @@ function barH(items, {fmt=F.n, maxV=null, unit=''}={}){
   return bindRows(elFromSvg(s));
 }
 
+/* Sipariş durumu × kanal — yığılı çubuk + altında anlaşılır değer tablosu */
+function statusByChannel(O){
+  const sts=['Teslim Edildi','İptal','İade','Diğer'];
+  const col={'Teslim Edildi':PAL['--good'],'İptal':PAL['--crit'],'İade':PAL['--warn'],'Diğer':PAL['--muted']};
+  const chs=CH.filter(c=>S.ch.has(c));
+  const cnt=(c,st)=>O.filter(o=>o.ch===c && o.st===st).length;
+  const box=document.createElement('div');
+  box.appendChild(barV(chs, sts.map(st=>({name:st,color:col[st],values:chs.map(c=>cnt(c,st))})),{fmt:F.n}));
+  let h=`<table class="st-sum"><thead><tr><th>Kanal</th>`+
+    sts.map(st=>`<th><span class="d" style="background:${col[st]}"></span>${esc(st)}</th>`).join('')+
+    `<th>Toplam</th></tr></thead><tbody>`;
+  chs.forEach(c=>{ h+=`<tr><td>${esc(c)}</td>`+
+    sts.map(st=>`<td>${F.n(cnt(c,st))}</td>`).join('')+
+    `<td class="tt">${F.n(O.filter(o=>o.ch===c).length)}</td></tr>`; });
+  h+=`<tr class="tot"><td>Tümü</td>`+
+    sts.map(st=>`<td>${F.n(O.filter(o=>o.st===st).length)}</td>`).join('')+
+    `<td class="tt">${F.n(O.length)}</td></tr></tbody></table>`;
+  box.insertAdjacentHTML('beforeend',h);
+  return box;
+}
+
 function barV(cats, series, {fmt=F.n, stacked=true, catFmt=(x=>x), note=null, values=false}={}){
   if(!cats.length || !series.length) return miss();
   const W=780, H=290, padL=58, padR=12, padT=14, padB=40;
@@ -781,10 +802,7 @@ RENDERERS.genel=(v)=>{
     donut(CH.filter(c=>S.ch.has(c)).map(c=>({label:c,value:sum(D.filter(o=>o.ch===c),o=>o.ciro),color:CV(CH_COL[c])})),{fmt:F.tlk})));
   g2.appendChild(panel('Kanala göre sipariş',null,
     donut(CH.filter(c=>S.ch.has(c)).map(c=>({label:c,value:O.filter(o=>o.ch===c).length,color:CV(CH_COL[c])})),{fmt:F.n})));
-  g2.appendChild(panel('Sipariş durumu (kanal)',null,(()=>{
-    const sts=['Teslim Edildi','İptal','İade','Diğer'], col={'Teslim Edildi':PAL['--good'],'İptal':PAL['--crit'],'İade':PAL['--warn'],'Diğer':PAL['--muted']};
-    return barV(CH.filter(c=>S.ch.has(c)),sts.map(st=>({name:st,color:col[st],values:CH.filter(c=>S.ch.has(c)).map(c=>O.filter(o=>o.ch===c&&o.st===st).length)})),{fmt:F.n});
-  })()));
+  g2.appendChild(panel('Sipariş durumu (kanal)',null,statusByChannel(O)));
   v.appendChild(panel('Sipariş yoğunluğu — haftanın günü × saat','Sipariş sayısı', heatDayHour(O), {mail:true}));
 };
 
@@ -848,10 +866,7 @@ RENDERERS.teslimat=(v)=>{
     kpi('Ort. teslim süresi',(withLead.length?F.n1(sum(withLead,leadH)/withLead.length)+' sa':'—'),'sipariş → teslim')
   ));
   const g=document.createElement('div'); g.className='grid g2'; v.appendChild(g);
-  g.appendChild(panel('Durum kırılımı (kanal)',null,(()=>{
-    const sts=['Teslim Edildi','İptal','İade','Diğer'], col={'Teslim Edildi':PAL['--good'],'İptal':PAL['--crit'],'İade':PAL['--warn'],'Diğer':PAL['--muted']};
-    return barV(CH.filter(c=>S.ch.has(c)),sts.map(st=>({name:st,color:col[st],values:CH.filter(c=>S.ch.has(c)).map(c=>O.filter(o=>o.ch===c&&o.st===st).length)})),{fmt:F.n});
-  })()));
+  g.appendChild(panel('Durum kırılımı (kanal)',null,statusByChannel(O)));
   g.appendChild(panel('Teslim süresi dağılımı','Sipariş → teslim (saat). Ticimax = planlanan slot.',
     histo(withLead.map(leadH),[0,1,2,4,8,16,24,48],x=>F.n1(x)+'sa')));
   g.appendChild(panel('Kanala göre ort. teslim süresi',null,
