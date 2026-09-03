@@ -23,9 +23,13 @@ supabase/
 - **Statik + Supabase** (sunucusuz). Pano tüm veriyi tek seferde alıp istemcide filtreler;
   bu yüzden veri, `analytics_payload` tablosunda **tek bir `jsonb` satırı** (`id = 'eticaret'`)
   olarak tutulur. `import.js` bu satırı `service_role` anahtarıyla günceller.
+- **Ham satış arşivi:** `topla.js` (canlı toplama) ayrıca `raw_orders` tablosunu besler.
+  `analytics_payload` her koşuda ezilirken `raw_orders` **birikir** — her çalıştırmada yeni
+  sipariş/kalem satırları `key` üzerinden upsert edilir (yeni → INSERT, görülen → UPDATE).
+  Kapatmak için `RAW_ORDERS=0` ya da `--no-raw`.
 - **Kimlik doğrulama:** Supabase Auth (e‑posta + parola). Oturum yoksa giriş kapısı çıkar.
-- **RLS:** `analytics_payload` yalnızca `authenticated` rolüne `select` verir. Yazma yalnızca
-  `service_role` (import betiği) ile.
+- **RLS:** `analytics_payload` ve `raw_orders` yalnızca `authenticated` rolüne `select` verir.
+  Yazma yalnızca `service_role` (import / topla betiği) ile.
 
 ---
 

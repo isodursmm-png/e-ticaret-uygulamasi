@@ -13,7 +13,12 @@
      node scripts/topla.js --dry-run           # Supabase'e yazma, özet bas
      node scripts/topla.js --local             # Supabase'e yazma; public/data.local.js
                                                # + public/local.html üret (login'siz önizleme)
+     node scripts/topla.js --no-raw            # raw_orders (ham arşiv) yazımını atla
      node scripts/topla.js --only=yemeksepeti --headed   # ilk kurulum / 2FA
+
+   Not: normal koşuda analytics_payload (tek satır, ezilir) + raw_orders
+   (ham satış arşivi, birikir) güncellenir. raw_orders için supabase/schema.sql
+   çalıştırılmış olmalı.
 
    Env: bkz. .env.example  (SUPABASE_URL, SUPABASE_SERVICE_ROLE + kaynak env'leri)
    ========================================================================== */
@@ -24,6 +29,7 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const { buildPayload, summary, compactGeo } = require('./lib/normalize');
 const { writeLocal } = require('./lib/local-preview');
+const { toRawRows, pushRaw } = require('./lib/raw-store');
 
 const SOURCES = [
   require('./lib/sources/ticimax'),
@@ -90,8 +96,14 @@ function loadGeo() {
   catch (e) { console.warn('geo okunamadı, atlanıyor:', e.message); return null; }
 }
 
+/** RAW_ORDERS=0 (env) veya --no-raw (CLI) ile ham arşiv yazımı kapatılır. */
+function rawEnabled(raw) {
+  if (raw === false) return false;
+  return String(process.env.RAW_ORDERS || '').trim() !== '0';
+}
+
 /** Çek + Supabase'e yaz. api/refresh.js ve CLI buradan geçer. */
-async function buildAndPush({ only = null, days, headed = false, dryRun = false, local = false } = {}) {
+async function buildAndPush({ only = null, days, headed = false, dryRun = false, local = false, raw = true } = {}) {
   const URL = process.env.SUPABASE_URL;
   const KEY = process.env.SUPABASE_SERVICE_ROLE;
   if (!dryRun && !local && (!URL || !KEY)) throw new Error('SUPABASE_URL ve SUPABASE_SERVICE_ROLE gerekli.');
@@ -106,7 +118,12 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
   const sum = summary(P);
   console.log('\nözet:', JSON.stringify(sum, null, 1));
 
-  if (dryRun) return { ok: true, dryRun: true, meta: P.meta, summary: sum, ran, skipped, errors };
+  const rawRows = rawEnabled(raw) ? toRawRows(merged) : [];
+
+  if (dryRun) {
+    console.log(`ham arşiv: ${rawRows.length} satır hazırlandı (raw_orders'a yazılmadı — dry-run)`);
+    return { ok: true, dryRun: true, meta: P.meta, summary: sum, rawRows: rawRows.length, ran, skipped, errors };
+  }
 
   if (local) {
     writeLocal(P, loadGeo());
@@ -124,16 +141,24 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
   if (error) throw new Error('Supabase upsert: ' + error.message);
 
   console.log(`\n✓ Supabase güncellendi — ${P.meta.orders} sipariş · ${P.meta.items} kalem · ${P.meta.minDate} – ${P.meta.maxDate}`);
-  return { ok: true, meta: P.meta, summary: sum, ran, skipped, errors };
+
+  let rawWritten = 0;
+  if (rawRows.length) {
+    rawWritten = await pushRaw(sb, rawRows);
+    console.log(`✓ raw_orders — ${rawWritten} ham satır yazıldı/güncellendi (yeni gelenler eklendi)`);
+  }
+
+  return { ok: true, meta: P.meta, summary: sum, rawWritten, ran, skipped, errors };
 }
 
 /* ---------------- CLI ---------------- */
 function parseArgs(argv) {
-  const a = { only: null, days: undefined, dryRun: false, headed: false, local: false };
+  const a = { only: null, days: undefined, dryRun: false, headed: false, local: false, raw: true };
   for (const s of argv) {
     if (s === '--dry-run') a.dryRun = true;
     else if (s === '--local') a.local = true;
     else if (s === '--all') a.days = 0;
+    else if (s === '--no-raw') a.raw = false;
     else if (s === '--headed') a.headed = true;
     else if (s.startsWith('--only=')) a.only = s.slice(7).split(',').map((x) => x.trim()).filter(Boolean);
     else if (s.startsWith('--days=')) a.days = Number(s.slice(7));
