@@ -140,7 +140,7 @@ function soapPage(doc) {
     TAMAMINI tek istekte veriyor (ör. 2026-08 → 4035 sipariş). Bu yüzden:
     index kullanmıyoruz; AY AY geriye gidip her ayı tek istekte çekiyoruz.
     Sipariş No ile tekilleştiriyoruz (pencere sınırındaki olası çakışmalar için). */
-async function fetchOrders({ days = 30 } = {}) {
+async function fetchRows({ days = 30 } = {}) {
   const url = endpoint();
   const kod = apiKey();
   const fullHistory = !days || days <= 0;
@@ -153,7 +153,9 @@ async function fetchOrders({ days = 30 } = {}) {
 
   const KAYIT = 100000;          // bir ayı tek istekte alacak kadar yüksek
   const BOS_AY_DUR = 6;          // 6 ardışık boş ay → geçmişin başına inilmiş say
-  const all = [];
+  // Bellek: ham SOAP nesnelerini biriktirmiyoruz (uzun geçmişte OOM). Her
+  // pencerenin yanıtını hemen düz t0/t1 satırına çevirip ham veriyi bırakıyoruz.
+  const t0 = [], t1 = [];
   const seen = new Set();
   let bosAy = 0;
 
@@ -164,25 +166,33 @@ async function fetchOrders({ days = 30 } = {}) {
   while (winEnd > floor) {
     if (winStart < floor) winStart = new Date(floor);
 
-    const doc = await soapCall(url, envelope(kod, isoL(winStart), isoL(winEnd), 0, KAYIT));
-    const list = soapPage(doc);
-    let yeni = 0;
+    let doc = await soapCall(url, envelope(kod, isoL(winStart), isoL(winEnd), 0, KAYIT));
+    let list = soapPage(doc);
+    doc = null;
+    const winLen = list.length;
+
+    let fresh = [];
     for (const x of list) {
       const no = str(x.SiparisNo) || str(x.ID) || str(x.SiparisKodu);
       if (no && seen.has(no)) continue;
       if (no) seen.add(no);
-      all.push(x); yeni++;
+      fresh.push(x);
     }
-    log(id, `[${isoL(winStart).slice(0, 10)}→${isoL(winEnd).slice(0, 10)}] ${list.length} kayıt / +${yeni} yeni (toplam ${all.length})`);
-    if (list.length >= KAYIT) log(id, `⚠ ${isoL(winStart).slice(0, 7)} penceresi ${KAYIT} sınırına dayandı — bölünmesi gerekebilir`);
+    list = null;
+    toRowsInto(fresh, t0, t1);   // ham → düz satır, ardından fresh çöpe
+    const yeni = fresh.length;
+    fresh = null;
 
-    bosAy = list.length === 0 ? bosAy + 1 : 0;
+    log(id, `[${isoL(winStart).slice(0, 10)}→${isoL(winEnd).slice(0, 10)}] ${winLen} kayıt / +${yeni} yeni (sipariş ${t1.length} · kalem ${t0.length})`);
+    if (winLen >= KAYIT) log(id, `⚠ ${isoL(winStart).slice(0, 7)} penceresi ${KAYIT} sınırına dayandı — bölünmesi gerekebilir`);
+
+    bosAy = winLen === 0 ? bosAy + 1 : 0;
     if (fullHistory && bosAy >= BOS_AY_DUR) { log(id, `${BOS_AY_DUR} ardışık boş ay — durduruldu`); break; }
 
     winEnd = winStart;
     winStart = new Date(winStart.getFullYear(), winStart.getMonth() - 1, 1);
   }
-  return all;
+  return { t0, t1 };
 }
 
 function magazaAdi(...cands) {
@@ -193,10 +203,7 @@ function magazaAdi(...cands) {
   return 'E-Ticaret Deposu';
 }
 
-function toRows(orders) {
-  const t0 = [];
-  const t1 = [];
-
+function toRowsInto(orders, t0, t1) {
   for (const s of orders) {
     const no = str(s.SiparisNo) || str(s.ID) || str(s.SiparisKodu);
     const dSip = str(s.SiparisTarihi);
@@ -260,7 +267,6 @@ function toRows(orders) {
       });
     }
   }
-  return { t0, t1 };
 }
 
 async function fetch(opts) {
@@ -268,8 +274,7 @@ async function fetch(opts) {
   // Tüm geçmişi bir kez çekip sonrası için hızlı tutmak isteyince kullanışlı.
   const ov = process.env.TICIMAX_FETCH_DAYS;
   const days = (ov != null && String(ov).trim() !== '') ? Number(ov) : (opts && opts.days);
-  const orders = await fetchOrders({ days });
-  const rows = toRows(orders);
+  const rows = await fetchRows({ days });
   log(id, `${rows.t1.length} sipariş · ${rows.t0.length} kalem`);
   return rows;
 }

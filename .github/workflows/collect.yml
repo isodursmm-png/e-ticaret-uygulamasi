@@ -32,6 +32,8 @@ jobs:
       - name: topla
         run: node scripts/topla.js
         env:
+          # Uzun geçmişte on binlerce sipariş + kalem bellekte birikir.
+          NODE_OPTIONS: --max-old-space-size=6144
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
           FETCH_DAYS: ${{ vars.FETCH_DAYS || '0' }}
