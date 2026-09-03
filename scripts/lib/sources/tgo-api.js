@@ -200,7 +200,9 @@ function toRows(pkgs) {
     const addr = p.shipmentAddress || p.invoiceAddress || {};
     const il = cityFromAddr(addr);
     const ilce = isMasked(addr.district) ? null : String(addr.district).trim();
-    const store = 'TGO ' + (pick(p, 'storeId', 'storeName') || 'Market');
+    // önce gerçek mağaza adı; yoksa "TGO <id>" (normalize STORE_NAMES ile adlandırılabilir)
+    const store = pick(p, 'storeName', 'warehouseName') || (p.store && p.store.name) ||
+      ('TGO ' + (pick(p, 'storeId', 'warehouseId') || 'Market'));
     const dCreateISO = toISO(pick(p, 'orderDate', 'packageCreationDate', 'createdDate'));
     const dDeliverISO = toISO(pick(p, 'estimatedDeliveryEndDate', 'deliveredDate', 'agreedDeliveryDate'));
     const rawStatus = pick(p, 'packageStatus', 'shipmentPackageStatus', 'status');

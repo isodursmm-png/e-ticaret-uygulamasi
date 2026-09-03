@@ -37,6 +37,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
           FETCH_DAYS: ${{ vars.FETCH_DAYS || '0' }}
+          STORE_NAMES: ${{ vars.STORE_NAMES }}
 
           TICIMAX_API_URL: ${{ vars.TICIMAX_API_URL }}
           TICIMAX_CODE: ${{ secrets.TICIMAX_CODE }}

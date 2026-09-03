@@ -47,9 +47,26 @@ function parseAny(v) {
 }
 
 // ---------- metin normalizasyonu ----------
+// STORE_NAMES env: "ni1e=Güzeloba; us58=Liman; 33841=Merkez"  (kod → dostane ad)
+const STORE_MAP = (() => {
+  const m = {};
+  String((typeof process !== 'undefined' && process.env && process.env.STORE_NAMES) || '')
+    .split(/[;\n]+/).forEach((pair) => {
+      const i = pair.indexOf('=');
+      if (i > 0) { const k = pair.slice(0, i).trim().toLowerCase(); const v = pair.slice(i + 1).trim(); if (k && v) m[k] = v; }
+    });
+  return m;
+})();
 const normStore = (s) => {
   if (!s) return 'Bilinmiyor';
-  let x = String(s).replace(/Tahtakale\s+(Spot\s+|Market\s+)?/gi, '').replace(/\s+Şubesi$/i, '').trim();
+  const raw = String(s).trim();
+  const lc = raw.toLowerCase();
+  // env eşlemesi: ham değer bir koda birebir eşit ya da onu bir kelime olarak içeriyorsa
+  const toks = lc.split(/[\s,.;·|/\\()\-]+/).filter(Boolean);
+  for (const k of Object.keys(STORE_MAP)) {
+    if (lc === k || toks.includes(k)) return STORE_MAP[k];
+  }
+  let x = raw.replace(/Tahtakale\s+(Spot\s+|Market\s+)?/gi, '').replace(/\s+Şubesi$/i, '').trim();
   if (/külliye/i.test(x)) x = 'Külliye';
   if (/e-?ticaret deposu/i.test(x)) x = 'E-Ticaret Deposu';
   return x || 'Bilinmiyor';

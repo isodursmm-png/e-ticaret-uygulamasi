@@ -120,6 +120,7 @@ async function fetchOrders() {
           const k = o.order_id || o.order_code || o.external_order_id;
           if (k && seen.has(k)) continue;
           if (k) seen.add(k);
+          o._vendorId = vendorId;   // mağaza kimliği (normalize STORE_NAMES ile adlandırır)
           all.push(o); added++; vAdded++;
         }
         log(id, `${vendorId} [${iso(winStart).slice(0, 10)}→${iso(winEnd).slice(0, 10)}] sayfa ${page}/${totalPages} — +${added} (toplam ${all.length})`);
@@ -154,7 +155,7 @@ function toRows(orders) {
       'Siparişin Alındığı Tarih': sys.created_at || null,
       'Teslimat zamanı': o.promised_for || o.accepted_for || null,
       'Sipariş Teslim Tarihi': o.status === 'DELIVERED' ? (sys.updated_at || o.promised_for || null) : null,
-      'Mağaza': (o.client && o.client.name) || 'Yemeksepeti',
+      'Mağaza': String(o._vendorId || (o.vendor && o.vendor.name) || 'Yemeksepeti'),
       'Teslimat Şehir': addr.city || null,
       'Teslimat İlçe': addr.suburb || addr.street || null,
       'Ödeme Yöntemi': odeme,
