@@ -234,17 +234,19 @@ function lineC(cats, series, {fmt=F.n, catFmt=(x=>x), area=false}={}){
     s+=`<path d="M${pts.map(p=>p.join(',')).join(' L')}" fill="none" stroke="${se.color}" stroke-width="2.2" stroke-linejoin="round"/>`;
     const last=pts[pts.length-1];
     s+=`<circle cx="${last[0]}" cy="${last[1]}" r="4" fill="${se.color}" stroke="${PAL['--surface']}" stroke-width="1.5"/>`;
-    s+=`<text x="${last[0]-6}" y="${last[1]-8}" text-anchor="end" font-size="11" font-weight="600" fill="${se.color}">${esc(fmt(se.values[se.values.length-1]))}</text>`;
+    s+=`<text x="${last[0]-9}" y="${last[1]-11}" text-anchor="end" font-size="11" font-weight="700" fill="${se.color}" paint-order="stroke" stroke="${PAL['--page']}" stroke-width="3.5">${esc(fmt(se.values[se.values.length-1]))}</text>`;
   });
-  // ay çizgilerinin üzerine o ayki gerçek (kısaltmasız) değeri yaz — tek seri
+  // ay başlarındaki gerçek (kısaltmasız) kümülatif değer — çizgiden ayrı, ok/kılavuz çizgisiyle
   if(monthMode && series.length===1){
     const se=series[0];
     tickIdx.forEach(i=>{
-      if(i===0 || i>=cats.length-1) return;                 // 0 ve son nokta zaten yazılı
+      if(i===0 || i > cats.length-8) return;                // 0 ve grafik sonu (uç etiket) hariç
       const v=se.values[i]; if(!(v>0)) return;
       const x=xAt(i), y=yAt(v);
-      s+=`<circle cx="${x}" cy="${y}" r="2.8" fill="${se.color}" stroke="${PAL['--surface']}" stroke-width="1"/>`;
-      s+=`<text x="${x+5}" y="${y-7}" text-anchor="start" font-size="10.5" font-weight="700" fill="${se.color}">${esc(fmt(v))}</text>`;
+      const ly=Math.max(padT+11, y-28);                     // etiket noktayı ~28px üstünde
+      s+=`<line x1="${x}" y1="${y-3}" x2="${x}" y2="${ly+3}" stroke="${se.color}" stroke-width="1.2" opacity=".65"/>`;
+      s+=`<circle cx="${x}" cy="${y}" r="3" fill="${se.color}" stroke="${PAL['--surface']}" stroke-width="1"/>`;
+      s+=`<text x="${x}" y="${ly}" text-anchor="middle" font-size="10.5" font-weight="700" fill="${se.color}" paint-order="stroke" stroke="${PAL['--page']}" stroke-width="3.5">${esc(fmt(v))}</text>`;
     });
   }
   s+=`<line id="xh" x1="0" x2="0" y1="${padT}" y2="${padT+ih}" stroke="${PAL['--hair-strong']}" opacity="0"/>`;
