@@ -655,6 +655,16 @@ function render(){
   (RENDERERS[hash]||RENDERERS.genel)(view);
   renderChips();
   renderDateBar();
+  syncBrandSrc();
+}
+
+function syncBrandSrc(){
+  const bs=document.getElementById('brandSrc'); if(!bs) return;
+  const all=S.ch.size>=CH.length;
+  bs.querySelectorAll('.src-pill').forEach(b=>{
+    const c=b.dataset.ch;
+    b.classList.toggle('on', c==='__all__' ? all : (!all && S.ch.has(c)));
+  });
 }
 
 function renderDateBar(){
@@ -663,13 +673,20 @@ function renderDateBar(){
   const mo = { from:_clampD(PL.meta.maxDate.slice(0,7)+'-01'), to:_clampD(_lastDom(PL.meta.maxDate.slice(0,7))) };
   const isR = r => S.from===r.from && S.to===r.to;
   const full = fullRange();
-  const wasOpen = !!(host.querySelector('.dr-inputs.open')) || !full;
+  // Veride bulunan yıllar (yeni → eski) — her rapor başlığından yıl süzme
+  const yr = y => ({ from:_clampD(y+'-01-01'), to:_clampD(y+'-12-31') });
+  const years=[]; for(let y=+PL.meta.maxDate.slice(0,4); y>=+PL.meta.minDate.slice(0,4); y--) years.push(y);
+  const isYear = years.some(y=>isR(yr(y)));
+  const wasOpen = !!(host.querySelector('.dr-inputs.open')) || (!full && !isYear);
   host.innerHTML =
     `<span class="drlbl">Dönem</span>`+
     `<button class="dr-btn dr-ay${!full&&isR(mo)?' on':''}" data-a="ay">📅 Ay</button>`+
     `<button class="dr-btn dr-hf${!full&&isR(wk)?' on':''}" data-a="hf">🗓️ Hafta</button>`+
-    `<button class="dr-btn dr-ta${!full&&!isR(mo)&&!isR(wk)?' on':''}" data-a="ta">📆 Tarih aralığı</button>`+
+    years.map(y=>`<button class="dr-btn dr-yr${!full&&isR(yr(y))?' on':''}" data-y="${y}">📅 ${y}</button>`).join('')+
+    `<button class="dr-btn dr-ta${!full&&!isR(mo)&&!isR(wk)&&!isYear?' on':''}" data-a="ta">📆 Tarih aralığı</button>`+
     `<button class="dr-btn dr-all${full?' on':''}" data-a="all">∞ Tümü</button>`+
+    `<button class="dr-btn dr-nav" data-nav="-1" title="Önceki dönem"${full?' disabled':''}>‹</button>`+
+    `<button class="dr-btn dr-nav" data-nav="1" title="Sonraki dönem"${full?' disabled':''}>›</button>`+
     `<span class="dr-inputs${wasOpen?' open':''}" id="drIn">`+
       `<input type="date" id="drFrom" min="${PL.meta.minDate}" max="${PL.meta.maxDate}" value="${S.from}">`+
       `<span>–</span>`+
@@ -677,10 +694,29 @@ function renderDateBar(){
   const go = () => { buildFilters(); render(); };
   host.querySelector('[data-a="ay"]').onclick = () => { S.from=mo.from; S.to=mo.to; go(); };
   host.querySelector('[data-a="hf"]').onclick = () => { S.from=wk.from; S.to=wk.to; go(); };
+  host.querySelectorAll('[data-y]').forEach(b=>b.onclick = () => { const r=yr(+b.dataset.y); S.from=r.from; S.to=r.to; go(); });
   host.querySelector('[data-a="all"]').onclick = () => { S.from=PL.meta.minDate; S.to=PL.meta.maxDate; go(); };
   host.querySelector('[data-a="ta"]').onclick = () => document.getElementById('drIn').classList.toggle('open');
+  host.querySelectorAll('[data-nav]').forEach(b=>b.onclick = () => shiftRange(+b.dataset.nav));
   host.querySelector('#drFrom').onchange = e => { S.from=e.target.value||PL.meta.minDate; if(S.from>S.to) S.to=S.from; go(); };
   host.querySelector('#drTo').onchange = e => { S.to=e.target.value||PL.meta.maxDate; if(S.to<S.from) S.from=S.to; go(); };
+}
+
+/* Seçili dönemi bir birim ileri/geri kaydır (dir = -1 önceki, +1 sonraki).
+   Tam ay / tam yıl seçiliyse takvim adımıyla, değilse aralık uzunluğu kadar gün kaydırır. */
+function shiftRange(dir){
+  if(fullRange()) return;
+  const f=S.from, t=S.to;
+  const isMonth = f.slice(8)==='01' && f.slice(0,7)===t.slice(0,7) && t===_lastDom(f.slice(0,7));
+  const isYear  = f.slice(5)==='01-01' && f.slice(0,4)===t.slice(0,4) && (t.slice(5)==='12-31' || t===PL.meta.maxDate);
+  let nf, nt;
+  if(isYear){ const y=(+f.slice(0,4))+dir; nf=y+'-01-01'; nt=y+'-12-31'; }
+  else if(isMonth){ const d=new Date(+f.slice(0,4), (+f.slice(5,7))-1+dir, 1);
+    const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); nf=ym+'-01'; nt=_lastDom(ym); }
+  else { const span=Math.round((Date.parse(t)-Date.parse(f))/864e5)+1; nf=_addDays(f,dir*span); nt=_addDays(t,dir*span); }
+  nf=_clampD(nf); nt=_clampD(nt);
+  if(nf===S.from && nt===S.to) return;   // kenardayız
+  S.from=nf; S.to=nt; buildFilters(); render();
 }
 
 RENDERERS.genel=(v)=>{
@@ -1132,7 +1168,19 @@ function buildNav(){
   }).join('');
   const srcNames=(PL.meta.sources&&PL.meta.sources.length?PL.meta.sources:CH);
   const bs=document.getElementById('brandSrc');
-  if(bs) bs.innerHTML=srcNames.map(n=>`<span class="src-pill" style="--sc:${CV(CH_COL[n]||'--muted')}">${esc(n)}</span>`).join('');
+  if(bs){
+    bs.innerHTML=
+      `<button type="button" class="src-pill" data-ch="__all__" style="--sc:var(--muted)" title="Tüm kanallar">Tümü</button>`+
+      CH.map(n=>`<button type="button" class="src-pill" data-ch="${esc(n)}" style="--sc:${CV(CH_COL[n]||'--muted')}" title="Sadece ${esc(n)}">${esc(n)}</button>`).join('');
+    bs.querySelectorAll('.src-pill').forEach(b=>b.onclick=()=>{
+      const c=b.dataset.ch;
+      if(c==='__all__') S.ch=new Set(CH);
+      else if(S.ch.size===1 && S.ch.has(c)) S.ch=new Set(CH);   // aynı pile tekrar tık → tümü
+      else S.ch=new Set([c]);                                    // sadece bu kanal
+      buildFilters(); render();
+    });
+    syncBrandSrc();
+  }
   document.getElementById('foot').innerHTML=
     `<b>${PL.meta.orders}</b> sipariş · <b>${PL.meta.items}</b> kalem<br>`+
     `${F.d(PL.meta.minDate)} – ${F.d(PL.meta.maxDate)}<br>Pazaryerleri: ${srcNames.join(' · ')}`;
