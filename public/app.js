@@ -480,19 +480,22 @@ function addLeaderLabels(map, items){
     const sz=map.getSize();
     svg.setAttribute('width',sz.x); svg.setAttribute('height',sz.y);
     while(svg.firstChild) svg.removeChild(svg.firstChild);
-    const cx=sz.x/2;
+    const cx=sz.x/2, M=6;
     const pts=items.map(it=>{ const p=map.latLngToContainerPoint([it.lat,it.lng]);
       const tw=Math.max(String(it.name).length, (it.ciroTxt+'  '+it.sipTxt).length)*6.6+16;
       return {...it, x:p.x, y:p.y, w:tw, h:44}; }).sort((a,b)=>a.y-b.y);
     const placed={ '-1':[], '1':[] };
-    const LEN=54, GAP=10;
+    const LEN=40, GAP=8;
     pts.forEach(it=>{
       const side = it.x>cx ? -1 : 1;
       const arr=placed[side];
       let ly=it.y-it.h/2;
       for(let i=0;i<arr.length;i++){ const r=arr[i];
         if(ly < r.y+r.h+GAP && ly+it.h+GAP > r.y){ ly=r.y+r.h+GAP; i=-1; } }
-      const lx = side<0 ? it.x - it.r - LEN - it.w : it.x + it.r + LEN;
+      // etiketi harita kutusunun içine sıkıştır — kenardan taşmasın
+      ly = Math.max(M, Math.min(ly, sz.y - it.h - M));
+      let lx = side<0 ? it.x - it.r - LEN - it.w : it.x + it.r + LEN;
+      lx = Math.max(M, Math.min(lx, sz.x - it.w - M));
       arr.push({y:ly,h:it.h});
       const x0=it.x + side*(it.r+2), x1=(side<0?lx+it.w:lx), y1=ly+it.h/2;
       const path=el('path');
@@ -537,11 +540,18 @@ function turkeyMapLeaflet(rows){
     normal.addTo(map);
     L.control.layers({ 'Harita': normal, 'Uydu': uydu }, null, { position:'topright', collapsed:false }).addTo(map);
 
-    // yalnızca Türkiye sınırları: sıkı yerleştir + dışına pan/zoom kilidi
+    // Türkiye'yi ekranda ortala; solda/sağda kılavuz etiketlerine boşluk bırak
     const trB = L.latLngBounds([[bb[1], bb[0]], [bb[3], bb[2]]]);
-    map.fitBounds(trB, { padding:[6,6] });
-    map.setMaxBounds(trB.pad(0.06));
-    map.setMinZoom(map.getBoundsZoom(trB));
+    const fitTR = () => {
+      map.invalidateSize(true);
+      const gutter = Math.min(190, Math.max(60, map.getSize().x * 0.16));
+      const pad = L.point(gutter, 24);
+      map.setMinZoom(0);
+      map.fitBounds(trB, { paddingTopLeft:pad, paddingBottomRight:pad });
+      map.setMaxBounds(trB.pad(0.1));
+      map.setMinZoom(map.getBoundsZoom(trB, false, pad));
+    };
+    fitTR();
 
     // ---- Türkiye dışını panel zeminiyle maskele: yalnızca ülke sınırları görünür ----
     const maskFill = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim() || '#12223d';
@@ -560,10 +570,10 @@ function turkeyMapLeaflet(rows){
       mk.addTo(map);
       labelItems.push({ lat:la, lng:lo, r:rad, name:r.il, ciroTxt:F.tl(r.ciro), sipTxt:F.n(r.sip)+' sipariş' });
     }
-    const ll = addLeaderLabels(map, labelItems);
+    const ll = addLeaderLabels(map, labelItems.slice(0, 14));   // en çok cirolu 14 il etiketlenir
     map.on('unload', ()=>ll.remove());
-    setTimeout(()=>{ map.invalidateSize(); ll.draw(); }, 60);
-    try{ new ResizeObserver(()=>map.invalidateSize()).observe(el); }catch(e){}
+    setTimeout(()=>{ fitTR(); ll.draw(); }, 80);
+    try{ new ResizeObserver(()=>{ map.invalidateSize(); ll.draw(); }).observe(el); }catch(e){}
   }, 0);
 
   if(noc.length){ const d=document.createElement('div'); d.className='sub'; d.style.marginTop='8px';
