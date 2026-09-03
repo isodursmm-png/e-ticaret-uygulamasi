@@ -95,7 +95,8 @@ function envelope(kod, basISO, sonISO, index, adet) {
 </tem:SelectSiparis></soap:Body></soap:Envelope>`;
 }
 
-const CALL_TIMEOUT = Number(process.env.TICIMAX_TIMEOUT_MS) || 120000;
+// Yoğun bir ay (binlerce sipariş + ürün satırları) tek istekte büyük yanıt döndürür.
+const CALL_TIMEOUT = Number(process.env.TICIMAX_TIMEOUT_MS) || 240000;
 
 async function soapCall(url, xml) {
   let lastErr;
@@ -127,24 +128,59 @@ async function soapCall(url, xml) {
   throw lastErr;
 }
 
+function soapPage(doc) {
+  const res = doc && doc.Envelope && doc.Envelope.Body &&
+    doc.Envelope.Body.SelectSiparisResponse && doc.Envelope.Body.SelectSiparisResponse.SelectSiparisResult;
+  return asArray(res && res.WebSiparis);
+}
+
+/** Ticimax SOAP `BaslangicIndex` (sayfalama) BOZUK: index>0 verildiğinde servis
+    1 kayıt döndürüyor; geniş tarih aralığında ise sıralı olmayan ~800'lük bir
+    kırpılmış küme veriyor. Ama DAR tarih penceresi + index 0 ile o pencerenin
+    TAMAMINI tek istekte veriyor (ör. 2026-08 → 4035 sipariş). Bu yüzden:
+    index kullanmıyoruz; AY AY geriye gidip her ayı tek istekte çekiyoruz.
+    Sipariş No ile tekilleştiriyoruz (pencere sınırındaki olası çakışmalar için). */
 async function fetchOrders({ days = 30 } = {}) {
   const url = endpoint();
   const kod = apiKey();
-  const bas = (!days || days <= 0) ? new Date('2015-01-01T00:00:00') : daysAgo(days);
-  const son = new Date(Date.now() + 86400e3);
+  const fullHistory = !days || days <= 0;
+  const floor = fullHistory ? new Date('2015-01-01T00:00:00') : daysAgo(days);
+  const now = new Date();
   const isoL = (d) => d.toISOString().slice(0, 19); // WCF yerel dateTime (Z'siz)
 
   log(id, `uç nokta: ${url}`);
+  log(id, `aralık: ${isoL(floor).slice(0, 10)} → ${isoL(now).slice(0, 10)} (ay ay, tek istek/ay)`);
+
+  const KAYIT = 100000;          // bir ayı tek istekte alacak kadar yüksek
+  const BOS_AY_DUR = 6;          // 6 ardışık boş ay → geçmişin başına inilmiş say
   const all = [];
-  const KAYIT = 200;
-  for (let sayfa = 0; sayfa < 2000; sayfa++) {
-    const doc = await soapCall(url, envelope(kod, isoL(bas), isoL(son), sayfa * KAYIT, KAYIT));
-    const res = doc && doc.Envelope && doc.Envelope.Body &&
-      doc.Envelope.Body.SelectSiparisResponse && doc.Envelope.Body.SelectSiparisResponse.SelectSiparisResult;
-    const list = asArray(res && res.WebSiparis);
-    for (const x of list) all.push(x);            // spread yok: büyük dizide stack taşar
-    log(id, `sayfa ${sayfa + 1} — ${list.length} sipariş (toplam ${all.length})`);
-    if (list.length !== KAYIT) break;             // tam KAYIT değilse (az ya da "hepsi tek seferde") bitti
+  const seen = new Set();
+  let bosAy = 0;
+
+  // ilk pencere [bu ayın 1'i, yarın); sonra her adımda bir ay geriye
+  let winEnd = new Date(now.getTime() + 86400e3);
+  let winStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  while (winEnd > floor) {
+    if (winStart < floor) winStart = new Date(floor);
+
+    const doc = await soapCall(url, envelope(kod, isoL(winStart), isoL(winEnd), 0, KAYIT));
+    const list = soapPage(doc);
+    let yeni = 0;
+    for (const x of list) {
+      const no = str(x.SiparisNo) || str(x.ID) || str(x.SiparisKodu);
+      if (no && seen.has(no)) continue;
+      if (no) seen.add(no);
+      all.push(x); yeni++;
+    }
+    log(id, `[${isoL(winStart).slice(0, 10)}→${isoL(winEnd).slice(0, 10)}] ${list.length} kayıt / +${yeni} yeni (toplam ${all.length})`);
+    if (list.length >= KAYIT) log(id, `⚠ ${isoL(winStart).slice(0, 7)} penceresi ${KAYIT} sınırına dayandı — bölünmesi gerekebilir`);
+
+    bosAy = list.length === 0 ? bosAy + 1 : 0;
+    if (fullHistory && bosAy >= BOS_AY_DUR) { log(id, `${BOS_AY_DUR} ardışık boş ay — durduruldu`); break; }
+
+    winEnd = winStart;
+    winStart = new Date(winStart.getFullYear(), winStart.getMonth() - 1, 1);
   }
   return all;
 }
@@ -228,7 +264,11 @@ function toRows(orders) {
 }
 
 async function fetch(opts) {
-  const orders = await fetchOrders(opts);
+  // TICIMAX_FETCH_DAYS: yalnız Ticimax için gün sınırını ezer (0/boş = tüm geçmiş).
+  // Tüm geçmişi bir kez çekip sonrası için hızlı tutmak isteyince kullanışlı.
+  const ov = process.env.TICIMAX_FETCH_DAYS;
+  const days = (ov != null && String(ov).trim() !== '') ? Number(ov) : (opts && opts.days);
+  const orders = await fetchOrders({ days });
   const rows = toRows(orders);
   log(id, `${rows.t1.length} sipariş · ${rows.t0.length} kalem`);
   return rows;
