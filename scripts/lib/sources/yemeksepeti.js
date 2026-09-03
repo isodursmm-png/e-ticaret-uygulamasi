@@ -25,6 +25,13 @@ const { log } = require('./_util');
 const id = 'yemeksepeti';
 
 function configured() {
+  // Yemeksepeti API adaptörü (yemeksepeti-api) yapılandırılmışsa Playwright yolunu kullanma.
+  // Vendor kimliği tek (YEMEKSEPETI_VENDOR_ID) ya da çok mağazalı (…_VENDOR_ID1..N) olabilir.
+  const hasVendor = !!(process.env.YEMEKSEPETI_VENDOR_ID || process.env.YEMEKSEPETI_VENDOR_ID1);
+  if (process.env.YEMEKSEPETI_CLIENT_ID && process.env.YEMEKSEPETI_CLIENT_SECRET &&
+      process.env.YEMEKSEPETI_CHAIN_ID && hasVendor) {
+    return false;
+  }
   // Panel girişi captcha/2FA'lı; otomasyon ancak codegen ile seçiciler + rapor
   // URL'si ayarlandıktan sonra çalışır. O yüzden YS_REPORT_URL yoksa atla
   // (her topla çalıştırmasında boşa tarayıcı açmamak için).

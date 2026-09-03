@@ -29,6 +29,7 @@ const SOURCES = [
   require('./lib/sources/ticimax'),
   require('./lib/sources/trendyol'),
   require('./lib/sources/tgo-api'),
+  require('./lib/sources/yemeksepeti-api'),
   require('./lib/sources/yemeksepeti'),
   require('./lib/sources/tgomarket')
 ];

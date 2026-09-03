@@ -45,6 +45,14 @@ jobs:
           TRENDYOL_API_SECRET: ${{ secrets.TRENDYOL_API_SECRET }}
           TRENDYOL_API_BASE: ${{ vars.TRENDYOL_API_BASE }}
 
+          # Yemeksepeti — Delivery Hero Partner API (tarayıcısız, öncelikli)
+          YEMEKSEPETI_API_BASE: ${{ vars.YEMEKSEPETI_API_BASE }}
+          YEMEKSEPETI_CLIENT_ID: ${{ secrets.YEMEKSEPETI_CLIENT_ID }}
+          YEMEKSEPETI_CLIENT_SECRET: ${{ secrets.YEMEKSEPETI_CLIENT_SECRET }}
+          YEMEKSEPETI_CHAIN_ID: ${{ secrets.YEMEKSEPETI_CHAIN_ID }}
+          YEMEKSEPETI_VENDOR_ID: ${{ vars.YEMEKSEPETI_VENDOR_ID }}
+
+          # Yemeksepeti — Playwright yolu (yalnızca API boşsa)
           YEMEKSEPETI_USER: ${{ secrets.YEMEKSEPETI_USER }}
           YEMEKSEPETI_PASS: ${{ secrets.YEMEKSEPETI_PASS }}
           YS_LOGIN_URL: ${{ vars.YS_LOGIN_URL }}

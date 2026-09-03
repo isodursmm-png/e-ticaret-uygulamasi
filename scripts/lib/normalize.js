@@ -196,7 +196,10 @@ function buildPayload({ t0 = [], t1 = [], ys = [], ty4 = [], ty5 = [] } = {}) {
     const d = parseAny(r['Kabul Edilme Zamanı']) || parseAny(r['Siparişin Alındığı Tarih']);
     const del = parseAny(r['Teslimat zamanı']) || parseAny(r['Sipariş Teslim Tarihi']);
     const store = normStore(r['Mağaza']);
-    const loc = YS_LOC[store] || [null, 'Antalya'];
+    // Önce satırdaki gerçek şehir/ilçe (API yolu), yoksa mağaza adından tahmin.
+    const cityCol = normCity(r['Teslimat Şehir']);
+    const ilceCol = (String(r['Teslimat İlçe'] || '').trim()) || null;
+    const loc = cityCol ? [ilceCol, cityCol] : (YS_LOC[store] || [null, 'Antalya']);
     const pay = (() => {
       const x = String(r['Ödeme Yöntemi'] || '').trim();
       if (/online/i.test(x)) return 'Online Kart';
