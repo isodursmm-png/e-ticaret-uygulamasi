@@ -147,7 +147,13 @@ button{font:inherit; cursor:pointer}
 .dr-btn.on{outline:2px solid var(--ink); outline-offset:1px; filter:brightness(1.06)}
 .dr-ay{background:linear-gradient(135deg,#6366f1,#8b5cf6)}
 .dr-hf{background:linear-gradient(135deg,#0ea5e9,#22d3ee)}
-.dr-yr{background:linear-gradient(135deg,#0d9488,#0891b2)}
+.dr-sel{font:inherit; font-size:9px; font-weight:700; color:#fff; cursor:pointer;
+  border:0; border-radius:999px; padding:5px 9px; box-shadow:0 1px 6px rgba(0,0,0,.22);
+  background:linear-gradient(135deg,#0d9488,#0891b2); -webkit-appearance:none; appearance:none;
+  transition:transform .08s ease, filter .15s ease}
+.dr-sel:hover{filter:brightness(1.1); transform:translateY(-1px)}
+.dr-sel.on{outline:2px solid var(--ink); outline-offset:1px; filter:brightness(1.06)}
+.dr-sel option{color:var(--ink); background:var(--surface); font-weight:600}
 .dr-ta{background:linear-gradient(135deg,#f59e0b,#f97316)}
 .dr-all{background:linear-gradient(135deg,#10b981,#059669)}
 .dr-nav{background:var(--surface-2); color:var(--ink); box-shadow:none;

@@ -676,13 +676,17 @@ function renderDateBar(){
   // Veride bulunan yıllar (yeni → eski) — her rapor başlığından yıl süzme
   const yr = y => ({ from:_clampD(y+'-01-01'), to:_clampD(y+'-12-31') });
   const years=[]; for(let y=+PL.meta.maxDate.slice(0,4); y>=+PL.meta.minDate.slice(0,4); y--) years.push(y);
-  const isYear = years.some(y=>isR(yr(y)));
+  const curYear = years.find(y=>isR(yr(y)));
+  const isYear = curYear!=null;
   const wasOpen = !!(host.querySelector('.dr-inputs.open')) || (!full && !isYear);
   host.innerHTML =
     `<span class="drlbl">Dönem</span>`+
     `<button class="dr-btn dr-ay${!full&&isR(mo)?' on':''}" data-a="ay">📅 Ay</button>`+
     `<button class="dr-btn dr-hf${!full&&isR(wk)?' on':''}" data-a="hf">🗓️ Hafta</button>`+
-    years.map(y=>`<button class="dr-btn dr-yr${!full&&isR(yr(y))?' on':''}" data-y="${y}">📅 ${y}</button>`).join('')+
+    `<select class="dr-sel${isYear?' on':''}" id="drYear" title="Yıla göre süz">`+
+      `<option value="">📅 Yıl</option>`+
+      years.map(y=>`<option value="${y}"${curYear===y?' selected':''}>${y}</option>`).join('')+
+    `</select>`+
     `<button class="dr-btn dr-ta${!full&&!isR(mo)&&!isR(wk)&&!isYear?' on':''}" data-a="ta">📆 Tarih aralığı</button>`+
     `<button class="dr-btn dr-all${full?' on':''}" data-a="all">∞ Tümü</button>`+
     `<button class="dr-btn dr-nav" data-nav="-1" title="Önceki dönem"${full?' disabled':''}>‹</button>`+
@@ -694,7 +698,7 @@ function renderDateBar(){
   const go = () => { buildFilters(); render(); };
   host.querySelector('[data-a="ay"]').onclick = () => { S.from=mo.from; S.to=mo.to; go(); };
   host.querySelector('[data-a="hf"]').onclick = () => { S.from=wk.from; S.to=wk.to; go(); };
-  host.querySelectorAll('[data-y]').forEach(b=>b.onclick = () => { const r=yr(+b.dataset.y); S.from=r.from; S.to=r.to; go(); });
+  host.querySelector('#drYear').onchange = e => { const y=+e.target.value; if(!y) return; const r=yr(y); S.from=r.from; S.to=r.to; go(); };
   host.querySelector('[data-a="all"]').onclick = () => { S.from=PL.meta.minDate; S.to=PL.meta.maxDate; go(); };
   host.querySelector('[data-a="ta"]').onclick = () => document.getElementById('drIn').classList.toggle('open');
   host.querySelectorAll('[data-nav]').forEach(b=>b.onclick = () => shiftRange(+b.dataset.nav));
