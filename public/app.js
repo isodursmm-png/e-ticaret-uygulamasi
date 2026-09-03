@@ -409,12 +409,13 @@ function dataTable(cols, rows, {sortDir=-1, per=12, foot=null, shade=null}={}){
 }
 
 /* pivot / matris (sipariş bazlı) */
-function pivot(O, {rowKey, colKey, metric, rowTop=26, colTop=18, rowFmt=(x=>x), colFmt=(x=>x)}){
+function pivot(O, {rowKey, colKey, metric, rowTop=26, colTop=18, rowFmt=(x=>x), colFmt=(x=>x), fmt=null}){
   const mfn = {
     ciro:{v:o=>deliv(o)?o.ciro:0, f:F.tlk}, sip:{v:()=>1, f:F.n}, adet:{v:o=>o.qty||0, f:F.n},
     net:{v:o=>deliv(o)?o.net:0, f:F.tlk}, kom:{v:o=>o.kom||0, f:F.tlk},
     aov:{v:o=>deliv(o)?o.ciro:0, f:F.tl, avg:true}
   }[metric];
+  if(fmt) mfn.f = fmt;
   const rowsMap=groupSum(O,o=>o[rowKey],mfn.v), rowCnt=groupSum(O,o=>o[rowKey],()=>1);
   const rl=[...rowsMap.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]).slice(0,rowTop);
   const colsMap=groupSum(O,o=>o[colKey],mfn.v), colCnt=groupSum(O,o=>o[colKey],()=>1);
@@ -856,6 +857,15 @@ RENDERERS.genel=(v)=>{
   g2.appendChild(panel('Kanala göre sipariş',null,
     donut(CH.filter(c=>S.ch.has(c)).map(c=>({label:c,value:O.filter(o=>o.ch===c).length,color:CV(CH_COL[c])})),{fmt:F.n})));
   g2.appendChild(panel('Sipariş durumu (kanal)',null,statusByChannel(O)));
+
+  // --- Aylık net ciro matrisleri (satır: pazaryeri / mağaza · kolon: ay) ---
+  v.appendChild(panel('Pazaryeri × Ay — net ciro','Teslim edilen siparişlerin aylık net hakedişi',
+    pivot(O,{rowKey:'ch', colKey:'mon', metric:'net', rowTop:9,
+      rowFmt:Object.assign(x=>x,{label:'Pazaryeri'}), colFmt:F.mon, fmt:F.tl})));
+  v.appendChild(panel('Mağaza × Ay — net ciro','Şube bazında aylık net hakediş',
+    pivot(O,{rowKey:'store', colKey:'mon', metric:'net', rowTop:40,
+      rowFmt:Object.assign(x=>x,{label:'Mağaza'}), colFmt:F.mon, fmt:F.tl})));
+
   v.appendChild(panel('Sipariş yoğunluğu — haftanın günü × saat','Sipariş sayısı', heatDayHour(O), {mail:true}));
 };
 
