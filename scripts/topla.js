@@ -27,7 +27,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
-const { buildPayload, summary, compactGeo } = require('./lib/normalize');
+const { buildPayload, summary, compactGeo, packData } = require('./lib/normalize');
 const { writeLocal } = require('./lib/local-preview');
 const { toRawRows, pushRaw } = require('./lib/raw-store');
 
@@ -137,10 +137,12 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
   const sum = summary(P);
   console.log('\nözet:', JSON.stringify(sum, null, 1));
 
-  const payloadMB = Buffer.byteLength(JSON.stringify(P)) / 1048576;
-  console.log(`payload: ${payloadMB.toFixed(1)} MB (${P.meta.orders} sipariş · ${P.meta.items} kalem)`);
-  if (payloadMB > 40) {
-    console.warn(`⚠ payload ${payloadMB.toFixed(0)} MB — Supabase/Cloudflare üst sınırına yakın. ` +
+  const packed = packData(P);
+  const rawMB = Buffer.byteLength(JSON.stringify(P)) / 1048576;
+  const gzMB = Buffer.byteLength(JSON.stringify(packed)) / 1048576;
+  console.log(`payload: ${rawMB.toFixed(1)} MB → gzip ${gzMB.toFixed(2)} MB (${P.meta.orders} sipariş · ${P.meta.itemRows} kalem satırı / ${P.meta.items} ham)`);
+  if (gzMB > 4.5) {
+    console.warn(`⚠ sıkıştırılmış payload ${gzMB.toFixed(1)} MB — Supabase ~5 MB sınırına yakın. ` +
       `TICIMAX_FETCH_DAYS (veya FETCH_DAYS) değerini düşür.`);
   }
 
@@ -160,7 +162,7 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
   await withRetry('analytics_payload upsert', async () => {
     const { error } = await sb.from('analytics_payload').upsert({
       id: 'eticaret',
-      data: P,
+      data: packed,
       geo: loadGeo(),
       meta: P.meta,
       updated_at: new Date().toISOString()

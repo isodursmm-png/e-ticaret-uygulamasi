@@ -904,7 +904,7 @@ RENDERERS.kategori=(v)=>{
   v.appendChild(kpirow(
     kpi('Kategori sayısı',F.n(new Set(I.map(x=>x.cat)).size))+
     kpi('Ürün çeşidi',F.n(new Set(I.map(x=>x.prod)).size))+
-    kpi('Toplam kalem',F.n(I.length))+
+    kpi('Toplam adet',F.n(sum(I,x=>x.qty)))+
     kpi('En çok satan kategori',(topEntries(catAdet,1)[0]||['—'])[0])
   ));
   const nt=document.createElement('div'); nt.className='note';

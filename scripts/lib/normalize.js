@@ -294,20 +294,42 @@ function buildPayload({ t0 = [], t1 = [], ys = [], ty4 = [], ty5 = [] } = {}) {
   const minDs = allDs[0] || null, maxDs = allDs[allDs.length - 1] || null;
   for (const o of ORD) o.isNew = o.ms ? (minDs && o.ms >= minDs ? 1 : 0) : null;
 
+  // itm'yi sıkıştır: aynı bağlam (kanal/gün/şehir/ilçe/mağaza/kaynak/durum/
+  // kategori/marka/ürün) → qty + amt topla. Pano tüm filtre ve gruplarını bu
+  // 10 alan üzerinden yaptığı için görünüm aynı; satır sayısı birkaç kat düşer.
+  const AGG_N = ITM_COLS.length - 2; // qty, amt hariç ilk 10 alan
+  const itmMap = new Map();
+  for (const o of ITM) {
+    let k = '';
+    for (let i = 0; i < AGG_N; i++) k += (o[ITM_COLS[i]] == null ? '' : o[ITM_COLS[i]]) + '';
+    const ex = itmMap.get(k);
+    if (ex) { ex.qty += num(o.qty); ex.amt = r2(ex.amt + num(o.amt)); }
+    else itmMap.set(k, Object.assign({}, o, { qty: num(o.qty), amt: r2(num(o.amt)) }));
+  }
+
   const ordRows = ORD.map((o) => ORD_COLS.map((c) => (o[c] === undefined ? null : o[c])));
-  const itmRows = ITM.map((o) => ITM_COLS.map((c) => (o[c] === undefined ? null : o[c])));
+  const itmAgg = [...itmMap.values()];
+  const itmRows = itmAgg.map((o) => ITM_COLS.map((c) => (o[c] === undefined ? null : o[c])));
   const CENT = {};
   for (const o of ORD) if (o.city && CENTROID[o.city]) CENT[o.city] = CENTROID[o.city];
 
   return {
     meta: {
       generated: new Date().toISOString(), minDate: minDs, maxDate: maxDs,
-      orders: ordRows.length, items: itmRows.length, sources: ['Ticimax', 'Yemeksepeti', 'Trendyol']
+      orders: ordRows.length, items: ITM.length, itemRows: itmRows.length,
+      sources: ['Ticimax', 'Yemeksepeti', 'Trendyol']
     },
     ordCols: ORD_COLS, ord: ordRows,
     itmCols: ITM_COLS, itm: itmRows,
     centroid: CENT
   };
+}
+
+const zlib = require('zlib');
+/** Payload'ı Supabase satırına sığdırmak için gzip+base64 sarmalar.
+    Pano (boot.js) __gz alanını görünce açar. */
+function packData(P) {
+  return { __gz: zlib.gzipSync(Buffer.from(JSON.stringify(P)), { level: 9 }).toString('base64') };
 }
 
 function summary(P) {
@@ -392,4 +414,4 @@ function badgeVariant(html, opts = {}) {
   return out.replace(/<\/title>/, '</title>\n' + favLink);
 }
 
-module.exports = { buildPayload, summary, writeHtml, writeAll, badgeVariant, compactGeo, num, r2, parseAny, fmtDate, normStore, normCity, WD };
+module.exports = { buildPayload, summary, packData, writeHtml, writeAll, badgeVariant, compactGeo, num, r2, parseAny, fmtDate, normStore, normCity, WD };

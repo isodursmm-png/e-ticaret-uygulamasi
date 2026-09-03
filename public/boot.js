@@ -76,7 +76,9 @@ async function start(_session) {
     if (error) throw error;
     if (!data || !data.data) throw new Error('analytics_payload boş — önce "npm run import" çalıştırın');
 
-    window.__PL__ = data.data;
+    let pl = data.data;
+    if (pl && pl.__gz) pl = JSON.parse(await gunzipB64(pl.__gz));   // topla.js/import.js gzip'liyor
+    window.__PL__ = pl;
     window.__GEO__ = data.geo || null;
 
     shell.classList.add('ready');
@@ -147,6 +149,18 @@ async function mountRefresh() {
       setTimeout(() => { b.disabled = false; b.textContent = label; }, 2500);
     }
   });
+}
+
+/** base64(gzip(json)) → json metni. Modern tarayıcı DecompressionStream'i ile. */
+async function gunzipB64(b64) {
+  if (typeof DecompressionStream !== 'function') {
+    throw new Error('Tarayıcınız sıkıştırılmış veriyi açamıyor (DecompressionStream desteği yok). Güncel bir tarayıcı kullanın.');
+  }
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return await new Response(stream).text();
 }
 
 function ceviriHata(m) {

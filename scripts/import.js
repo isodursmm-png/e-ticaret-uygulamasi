@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
 const { createClient } = require('@supabase/supabase-js');
-const { buildPayload, summary, compactGeo } = require('./lib/normalize');
+const { buildPayload, summary, compactGeo, packData } = require('./lib/normalize');
 const { writeLocal } = require('./lib/local-preview');
 
 const LOCAL = process.argv.includes('--local');
@@ -56,16 +56,17 @@ const rd = (f) => {
   }
 
   const sb = createClient(URL, KEY, { auth: { persistSession: false } });
+  const packed = packData(P);
   const { error } = await sb.from('analytics_payload').upsert({
     id: 'eticaret',
-    data: P,
+    data: packed,
     geo,
     meta: P.meta,
     updated_at: new Date().toISOString()
   });
   if (error) { console.error('Supabase upsert hatası:', error.message); process.exit(1); }
 
-  const kb = (JSON.stringify(P).length / 1024).toFixed(0);
-  console.log(`\n✓ Supabase güncellendi  (analytics_payload / id=eticaret, ~${kb} KB)`);
+  const kb = (JSON.stringify(packed).length / 1024).toFixed(0);
+  console.log(`\n✓ Supabase güncellendi  (analytics_payload / id=eticaret, gzip ~${kb} KB)`);
   console.log(`  ${P.meta.orders} sipariş · ${P.meta.items} kalem · ${P.meta.minDate} – ${P.meta.maxDate}`);
 })().catch((e) => { console.error(e); process.exit(1); });
