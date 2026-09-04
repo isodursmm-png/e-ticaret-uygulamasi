@@ -10,6 +10,7 @@ const CH = ['Ticimax','Yemeksepeti','Trendyol'];
 const CH_COL = { Ticimax:'--s1', Yemeksepeti:'--s2', Trendyol:'--s3' };
 const MONTHS_TR = {'01':'Oca','02':'Şub','03':'Mar','04':'Nis','05':'May','06':'Haz','07':'Tem','08':'Ağu','09':'Eyl','10':'Eki','11':'Kas','12':'Ara'};
 const WEEK = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+const hourLbl = h => String(h).padStart(2,'0')+':00';   // 7 -> "07:00"
 
 /* Yemeksepeti / Delivery Hero iptal sebebi kodları → Türkçe */
 const CANCEL_TR = {
@@ -323,14 +324,21 @@ function heat(rowLabels, colLabels, matrix, {fmt=F.n, colFmt=(x=>x)}={}){
   const lblW=Math.min(160, 56+Math.max(...rowLabels.map(l=>String(l).length))*6.4);
   const W=lblW+colLabels.length*cw+12, H=34+rowLabels.length*rhh+6;
   const max=Math.max(...matrix.flat(),1);
+  // en yüksek 3 hücre kırmızı vurgulanır
+  const ranked=[];
+  matrix.forEach((row,ri)=>row.forEach((v,ci)=>{ if(v>0) ranked.push({ri,ci,v}); }));
+  ranked.sort((a,b)=>b.v-a.v);
+  const red=new Set(ranked.slice(0,3).map(x=>x.ri+'_'+x.ci));
+  const crit=PAL['--crit'];
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img">`;
   colLabels.forEach((c,ci)=> s+=`<text x="${lblW+ci*cw+cw/2}" y="24" text-anchor="middle" font-size="10" fill="${PAL['--muted']}">${esc(colFmt(c))}</text>`);
   rowLabels.forEach((rl,ri)=>{
     s+=`<text x="${lblW-8}" y="${34+ri*rhh+rhh/2+4}" text-anchor="end" font-size="11" fill="${PAL['--ink-2']}">${esc(rl)}</text>`;
     colLabels.forEach((cl,ci)=>{
-      const v=matrix[ri][ci]||0, t=v/max;
-      s+=`<rect x="${lblW+ci*cw}" y="${34+ri*rhh}" width="${cw-2}" height="${rhh-2}" rx="2" fill="${v?mix(PAL['--heat-0'],PAL['--heat-1'],0.12+t*0.88):PAL['--surface-2']}" class="rowh" data-t="${esc(rl)} · ${esc(colFmt(cl))}||${esc(fmt(v))}"/>`;
-      if(t>0.16) s+=`<text x="${lblW+ci*cw+cw/2-1}" y="${34+ri*rhh+rhh/2+4}" text-anchor="middle" font-size="9.5" fill="${t>0.55?'#fff':PAL['--ink-2']}" style="font-variant-numeric:tabular-nums">${esc(fmt(v))}</text>`;
+      const v=matrix[ri][ci]||0, t=v/max, isRed=red.has(ri+'_'+ci);
+      const fill=isRed ? crit : (v?mix(PAL['--heat-0'],PAL['--heat-1'],0.12+t*0.88):PAL['--surface-2']);
+      s+=`<rect x="${lblW+ci*cw}" y="${34+ri*rhh}" width="${cw-2}" height="${rhh-2}" rx="2" fill="${fill}"${isRed?' stroke="#fff" stroke-width="1"':''} class="rowh" data-t="${esc(rl)} · ${esc(colFmt(cl))}||${esc(fmt(v))}"/>`;
+      if(isRed || t>0.16) s+=`<text x="${lblW+ci*cw+cw/2-1}" y="${34+ri*rhh+rhh/2+4}" text-anchor="middle" font-size="9.5" font-weight="${isRed?'800':'400'}" fill="${(isRed||t>0.55)?'#fff':PAL['--ink-2']}" style="font-variant-numeric:tabular-nums">${esc(fmt(v))}</text>`;
     });
   });
   s+=`</svg>`;
@@ -697,7 +705,7 @@ function heatDayHour(O){
   const days=WEEK.filter(d=>O.some(o=>o.wd===d));
   const hours=range(7,23);
   const M=days.map(d=>hours.map(h=>O.filter(o=>o.wd===d&&o.hr===h).length));
-  const el=heat(days,hours,M,{fmt:F.n,colFmt:h=>h});
+  const el=heat(days,hours,M,{fmt:F.n,colFmt:hourLbl});
   if(!days.length) return el;
   let peak={v:-1,d:'',h:0};
   days.forEach((d,ri)=>hours.forEach((h,ci)=>{ if(M[ri][ci]>peak.v) peak={v:M[ri][ci],d,h}; }));
@@ -982,7 +990,7 @@ RENDERERS.zaman=(v)=>{
     barV(range(0,23),[{name:'Teslimat',color:PAL['--accent'],values:range(0,23).map(h=>O.filter(o=>o.dh===h).length)}],{fmt:F.n})));
   g.appendChild(panel('Tarih × saat yoğunluğu',null,(()=>{
     const ds=catsDates(O), hs=range(7,23);
-    return heat(ds.map(F.d),hs,ds.map(d=>hs.map(h=>O.filter(o=>o.ds===d&&o.hr===h).length)),{fmt:F.n});
+    return heat(ds.map(F.d),hs,ds.map(d=>hs.map(h=>O.filter(o=>o.ds===d&&o.hr===h).length)),{fmt:F.n,colFmt:hourLbl});
   })()));
   g.appendChild(panel('Haftanın gününe göre ort. teslim süresi','saat',(()=>{
     const W=WEEK.filter(d=>O.some(o=>o.wd===d));
