@@ -30,6 +30,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { buildPayload, summary, compactGeo, packData } = require('./lib/normalize');
 const { writeLocal } = require('./lib/local-preview');
 const { toRawRows, pushRaw } = require('./lib/raw-store');
+const { publishFromRaw } = require('./lib/publish-payload');
 
 const SOURCES = [
   require('./lib/sources/ticimax'),
@@ -135,16 +136,7 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
 
   const P = buildPayload(merged);
   const sum = summary(P);
-  console.log('\nözet:', JSON.stringify(sum, null, 1));
-
-  const packed = packData(P);
-  const rawMB = Buffer.byteLength(JSON.stringify(P)) / 1048576;
-  const gzMB = Buffer.byteLength(JSON.stringify(packed)) / 1048576;
-  console.log(`payload: ${rawMB.toFixed(1)} MB → gzip ${gzMB.toFixed(2)} MB (${P.meta.orders} sipariş · ${P.meta.itemRows} kalem satırı / ${P.meta.items} ham)`);
-  if (gzMB > 4.5) {
-    console.warn(`⚠ sıkıştırılmış payload ${gzMB.toFixed(1)} MB — Supabase ~5 MB sınırına yakın. ` +
-      `TICIMAX_FETCH_DAYS (veya FETCH_DAYS) değerini düşür.`);
-  }
+  console.log('\nözet (bu koşu):', JSON.stringify(sum, null, 1));
 
   const rawRows = rawEnabled(raw) ? toRawRows(merged) : [];
 
@@ -159,36 +151,40 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
   }
 
   const sb = createClient(URL, KEY, { auth: { persistSession: false } });
-  await withRetry('analytics_payload upsert', async () => {
-    const { error } = await sb.from('analytics_payload').upsert({
-      id: 'eticaret',
-      data: packed,
-      geo: loadGeo(),
-      meta: P.meta,
-      updated_at: new Date().toISOString()
-    });
-    if (error) throw new Error('Supabase upsert: ' + (error.message || JSON.stringify(error)).slice(0, 300));
-  });
 
-  console.log(`\n✓ Supabase güncellendi — ${P.meta.orders} sipariş · ${P.meta.items} kalem · ${P.meta.minDate} – ${P.meta.maxDate}`);
-
-  // Ham arşiv yazımı tamamlayıcıdır: başarısız olsa bile pano (analytics_payload)
-  // güncel kaldığından koşuyu düşürmeyiz — sadece uyarırız.
+  // 1) Ham arşivi bu koşunun taze verisiyle güncelle (yeni sipariş/kalem eklenir).
   let rawWritten = 0;
   if (rawRows.length) {
     try {
       rawWritten = await withRetry('raw_orders upsert', () => pushRaw(sb, rawRows));
-      console.log(`✓ raw_orders — ${rawWritten} ham satır yazıldı/güncellendi (yeni gelenler eklendi)`);
+      console.log(`✓ raw_orders — ${rawWritten} ham satır yazıldı/güncellendi`);
     } catch (e) {
       const hint = /relation .*raw_orders.* does not exist|Could not find the table/i.test(e.message)
-        ? ' — supabase/schema.sql (raw_orders bloğu) çalıştırılmamış olabilir'
-        : '';
+        ? ' — supabase/schema.sql çalıştırılmamış olabilir' : '';
       console.warn(`⚠ raw_orders atlandı: ${e.message}${hint}`);
       errors.push(`raw_orders: ${e.message}`);
     }
   }
 
-  return { ok: true, meta: P.meta, summary: sum, rawWritten, ran, skipped, errors };
+  // 2) Panoyu ham arşivin TAMAMINDAN kur (tüm geçmiş) — parçalı yaz.
+  let pub;
+  try {
+    pub = await withRetry('analytics_payload publish', () =>
+      publishFromRaw(sb, { geo: loadGeo(), fallbackP: P, log: (m) => console.log('  ' + m) }));
+    console.log(`\n✓ analytics_payload — ${pub.meta.orders} sipariş · ${pub.meta.minDate} – ${pub.meta.maxDate} · ${pub.chunks} parça${pub.fallback ? ' (fallback: canlı)' : ''}`);
+  } catch (e) {
+    console.warn(`⚠ tüm-geçmiş kurulum başarısız (${e.message}) — canlı payload tek satır yazılıyor`);
+    errors.push(`publish: ${e.message}`);
+    await withRetry('analytics_payload fallback', async () => {
+      const { error } = await sb.from('analytics_payload').upsert({
+        id: 'eticaret', data: packData(P), geo: loadGeo(), meta: P.meta, updated_at: new Date().toISOString()
+      });
+      if (error) throw new Error(error.message);
+    });
+    pub = { meta: P.meta, chunks: 1, fallback: true };
+  }
+
+  return { ok: true, meta: pub.meta, summary: sum, rawWritten, chunks: pub.chunks, ran, skipped, errors };
 }
 
 /* ---------------- CLI ---------------- */

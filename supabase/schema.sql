@@ -62,6 +62,7 @@ create index if not exists raw_orders_source_idx     on public.raw_orders (sourc
 create index if not exists raw_orders_order_date_idx  on public.raw_orders (order_date);
 create index if not exists raw_orders_order_no_idx    on public.raw_orders (order_no);
 create index if not exists raw_orders_channel_date_idx on public.raw_orders (channel, order_date);
+create index if not exists raw_orders_source_date_idx  on public.raw_orders (source, order_date);
 
 alter table public.raw_orders enable row level security;
 

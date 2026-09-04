@@ -68,18 +68,28 @@ async function start(_session) {
   hideGate();
   msg.textContent = '';
   try {
-    const { data, error } = await supabase
+    // 'eticaret' ana satırı + varsa 'eticaret~pN' parça satırları (tüm-geçmiş payload'ı)
+    const { data: rows, error } = await supabase
       .from('analytics_payload')
-      .select('data, geo')
-      .eq('id', 'eticaret')
-      .single();
+      .select('id, data, geo')
+      .like('id', 'eticaret%')
+      .order('id', { ascending: true });
     if (error) throw error;
-    if (!data || !data.data) throw new Error('analytics_payload boş — önce "npm run import" çalıştırın');
+    const main = (rows || []).find((r) => r.id === 'eticaret');
+    if (!main || !main.data) throw new Error('analytics_payload boş — önce "npm run topla" / "rebuild-from-raw" çalıştırın');
 
-    let pl = data.data;
-    if (pl && pl.__gz) pl = JSON.parse(await gunzipB64(pl.__gz));   // topla.js/import.js gzip'liyor
+    let pl = main.data;
+    if (pl && pl.__chunks != null) {                       // parçalı: birleştir → gunzip
+      const parts = (rows || [])
+        .filter((r) => /^eticaret~p\d+$/.test(r.id))
+        .sort((a, b) => (+a.id.slice(10)) - (+b.id.slice(10)))
+        .map((r) => r.data && r.data.__part).join('');
+      pl = JSON.parse(await gunzipB64(parts));
+    } else if (pl && pl.__gz) {                            // tek parça gzip
+      pl = JSON.parse(await gunzipB64(pl.__gz));
+    }
     window.__PL__ = pl;
-    window.__GEO__ = data.geo || null;
+    window.__GEO__ = main.geo || null;
 
     shell.classList.add('ready');
     mountRefresh();

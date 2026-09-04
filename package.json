@@ -8,10 +8,11 @@
     "build:web": "node scripts/build-web.js",
     "import": "node scripts/import.js",
     "import:local": "node scripts/import.js --local",
-    "topla": "node scripts/topla.js",
+    "topla": "node --max-old-space-size=6144 scripts/topla.js",
     "topla:dry": "node scripts/topla.js --dry-run",
     "topla:local": "node scripts/topla.js --local",
-    "backfill": "node --max-old-space-size=4096 scripts/backfill-raw.js",
+    "backfill": "node --max-old-space-size=6144 scripts/backfill-raw.js",
+    "rebuild": "node --max-old-space-size=6144 scripts/rebuild-from-raw.js",
     "dev": "node scripts/serve.js"
   },
   "dependencies": {

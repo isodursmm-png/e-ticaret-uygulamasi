@@ -150,7 +150,10 @@ function payFromTicimax(x) {
 }
 
 /* ==================== ANA ==================== */
-function buildPayload({ t0 = [], t1 = [], ys = [], ty4 = [], ty5 = [] } = {}) {
+/* opts.itmMonthly = true → kalem (ITM) satırları gün yerine AY bazında toplanır
+   (tüm geçmiş payload'ı için boyutu düşürür; sipariş satırları gün kalır). */
+function buildPayload({ t0 = [], t1 = [], ys = [], ty4 = [], ty5 = [] } = {}, opts = {}) {
+  const itmMonthly = !!opts.itmMonthly;
   const ORD = [];
   const ITM = [];
 
@@ -317,6 +320,7 @@ function buildPayload({ t0 = [], t1 = [], ys = [], ty4 = [], ty5 = [] } = {}) {
   const AGG_N = ITM_COLS.length - 2; // qty, amt hariç ilk 10 alan
   const itmMap = new Map();
   for (const o of ITM) {
+    if (itmMonthly && o.ds) o.ds = o.ds.slice(0, 7) + '-01';   // ay bazına indir
     let k = '';
     for (let i = 0; i < AGG_N; i++) k += (o[ITM_COLS[i]] == null ? '' : o[ITM_COLS[i]]) + '';
     const ex = itmMap.get(k);
@@ -347,6 +351,17 @@ const zlib = require('zlib');
     Pano (boot.js) __gz alanını görünce açar. */
 function packData(P) {
   return { __gz: zlib.gzipSync(Buffer.from(JSON.stringify(P)), { level: 9 }).toString('base64') };
+}
+
+/** Büyük payload'ı gzip'leyip base64'ü ~maxChunk baytlık parçalara böler.
+    → { b64full, chunks:[...], bytes, gz } ; her parça ayrı Supabase satırına yazılır
+    (tek satır/istek ~5 MB sınırını aşan tüm-geçmiş payload'ı için). */
+function packChunks(P, maxChunk = 3_000_000) {
+  const gz = zlib.gzipSync(Buffer.from(JSON.stringify(P)), { level: 9 });
+  const b64 = gz.toString('base64');
+  const chunks = [];
+  for (let i = 0; i < b64.length; i += maxChunk) chunks.push(b64.slice(i, i + maxChunk));
+  return { chunks, bytes: Buffer.byteLength(JSON.stringify(P)), gz: gz.length, b64len: b64.length };
 }
 
 function summary(P) {
@@ -431,4 +446,4 @@ function badgeVariant(html, opts = {}) {
   return out.replace(/<\/title>/, '</title>\n' + favLink);
 }
 
-module.exports = { buildPayload, summary, packData, writeHtml, writeAll, badgeVariant, compactGeo, num, r2, parseAny, fmtDate, normStore, normCity, WD };
+module.exports = { buildPayload, summary, packData, packChunks, writeHtml, writeAll, badgeVariant, compactGeo, num, r2, parseAny, fmtDate, normStore, normCity, WD };

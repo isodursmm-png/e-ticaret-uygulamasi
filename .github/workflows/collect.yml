@@ -42,9 +42,9 @@ jobs:
           TICIMAX_API_URL: ${{ vars.TICIMAX_API_URL }}
           TICIMAX_CODE: ${{ secrets.TICIMAX_CODE }}
           TICIMAX_TIMEOUT_MS: ${{ vars.TICIMAX_TIMEOUT_MS }}
-          # Pano (analytics_payload) için sınırlı tut — ör. 90. Tüm geçmiş
-          # `npm run backfill` ile bir kez raw_orders'a dolduruldu.
-          TICIMAX_FETCH_DAYS: ${{ vars.TICIMAX_FETCH_DAYS || '90' }}
+          # Pano artık raw_orders'ın TAMAMINDAN kuruluyor; canlı çekim yalnız
+          # arşivi güncel tutar → küçük pencere yeter (yeni + son değişen siparişler).
+          TICIMAX_FETCH_DAYS: ${{ vars.TICIMAX_FETCH_DAYS || '30' }}
 
           TRENDYOL_SELLER_ID: ${{ secrets.TRENDYOL_SELLER_ID }}
           TRENDYOL_API_KEY: ${{ secrets.TRENDYOL_API_KEY }}
