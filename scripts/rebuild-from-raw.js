@@ -16,7 +16,7 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const { buildPayload, summary, compactGeo, packChunks } = require('./lib/normalize');
 const { fetchMergedFromRaw } = require('./lib/from-raw');
-const { publishFromRaw } = require('./lib/publish-payload');
+const { publishFromRaw, publishTufe } = require('./lib/publish-payload');
 
 function loadGeo() {
   try { return compactGeo(JSON.parse(fs.readFileSync(path.join(__dirname, 'tr-cities.json'), 'utf8'))); }
@@ -53,6 +53,8 @@ async function main() {
   const r = await publishFromRaw(sb, { geo: loadGeo(), sinceISO, log: (m) => console.log('  ' + m) });
   console.log(`\n✓ analytics_payload kuruldu — ${r.meta.orders} sipariş · ${r.meta.itemRows} kalem satırı · ` +
     `${r.meta.minDate} – ${r.meta.maxDate} · ${r.chunks} parça`);
+
+  await publishTufe(sb, (m) => console.log('  ' + m));
 }
 
 main().then(() => { process.exitCode = 0; })

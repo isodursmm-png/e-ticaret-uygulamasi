@@ -30,7 +30,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { buildPayload, summary, compactGeo, packData } = require('./lib/normalize');
 const { writeLocal } = require('./lib/local-preview');
 const { toRawRows, pushRaw } = require('./lib/raw-store');
-const { publishFromRaw } = require('./lib/publish-payload');
+const { publishFromRaw, publishTufe } = require('./lib/publish-payload');
 
 const SOURCES = [
   require('./lib/sources/ticimax'),
@@ -183,6 +183,9 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
     });
     pub = { meta: P.meta, chunks: 1, fallback: true };
   }
+
+  // 3) Aylık TÜİK TÜFE (FİNAL segmenti "Enf. %") — ayrı satır, hata yutulur.
+  await publishTufe(sb, (m) => console.log('  ' + m));
 
   return { ok: true, meta: pub.meta, summary: sum, rawWritten, chunks: pub.chunks, ran, skipped, errors };
 }

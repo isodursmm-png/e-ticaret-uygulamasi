@@ -56,4 +56,24 @@ async function publishFromRaw(sb, { geo = null, sinceISO = null, fallbackP = nul
   return { meta: P.meta, chunks: pk.chunks.length, total, byBucket, removed };
 }
 
-module.exports = { publishFromRaw, MAIN_ID };
+/** Aylık TÜİK TÜFE'yi ayrı bir satıra yaz: id='tufe' → { data:{ monthly, updated } }.
+    boot.js bunu okuyup window.__TUFE__ yapar; FİNAL segmenti "Enf. %" sütununda kullanır.
+    Hatalar yutulur — pano kurulumunu bloklamaz. */
+async function publishTufe(sb, log = () => {}) {
+  try {
+    const { monthlyTufe } = require('./tufe');
+    const monthly = await monthlyTufe();
+    const n = Object.keys(monthly).length;
+    if (!n) return { ok: false, months: 0 };
+    const { error } = await sb.from('analytics_payload')
+      .upsert({ id: 'tufe', data: { monthly, updated: new Date().toISOString() }, updated_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
+    log(`TÜFE tablosu yazıldı — ${n} ay`);
+    return { ok: true, months: n };
+  } catch (e) {
+    log('TÜFE yazılamadı: ' + (e.message || e));
+    return { ok: false, error: String(e.message || e) };
+  }
+}
+
+module.exports = { publishFromRaw, publishTufe, MAIN_ID };

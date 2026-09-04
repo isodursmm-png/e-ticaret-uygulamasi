@@ -91,6 +91,13 @@ async function start(_session) {
     window.__PL__ = pl;
     window.__GEO__ = main.geo || null;
 
+    // Aylık TÜİK TÜFE (FİNAL segmenti "Enf. %") — ayrı küçük satır, opsiyonel
+    try {
+      const { data: t } = await supabase
+        .from('analytics_payload').select('data').eq('id', 'tufe').maybeSingle();
+      window.__TUFE__ = (t && t.data) || null;
+    } catch (e) { window.__TUFE__ = null; }
+
     shell.classList.add('ready');
     mountRefresh();
     const s = document.createElement('script');

@@ -130,6 +130,12 @@ button{font:inherit; cursor:pointer}
   border-color:color-mix(in srgb,var(--gc) 45%,transparent); border-left:3px solid var(--gc);
   color:var(--ink); font-weight:600}
 .nav a.navobj.on .ic{background:var(--gc); color:var(--surface)}
+/* FİNAL segmenti — vurgulu */
+.nav a.navobj-fin{background:color-mix(in srgb,var(--good) 15%,var(--panel)); border-color:color-mix(in srgb,var(--good) 45%,transparent);
+  border-left-width:4px; border-left-color:var(--good); color:var(--ink); font-weight:700;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--good) 22%,transparent), 0 4px 14px color-mix(in srgb,var(--good) 22%,transparent)}
+.nav a.navobj-fin .ic{background:var(--good); color:#fff}
+.nav a.navobj-fin.on{background:color-mix(in srgb,var(--good) 26%,var(--panel))}
 .side .foot{padding:14px 18px; border-top:1px solid var(--panel-line); font-size:11px; color:var(--muted)}
 .side .foot b{color:var(--ink-2); font-weight:600}
 
@@ -250,6 +256,12 @@ table.dt thead th:hover{color:#d7e4ff}
 table.dt tbody tr:hover td{background:var(--surface-2)}
 table.dt td.num{font-variant-numeric:tabular-nums}
 table.dt tfoot td{font-weight:700; border-top:2px solid var(--hair-strong); border-bottom:0; font-variant-numeric:tabular-nums}
+/* FİNAL tablosu */
+table.dt.fin tr.fin-grp td{border-top:2px solid var(--hair-strong)}
+table.dt.fin tr.fin-grp td:first-child{font-weight:700; color:var(--ink)}
+input.fin-oto{width:92px; text-align:right; font:inherit; font-variant-numeric:tabular-nums;
+  border:1px solid var(--hair-strong); border-radius:6px; padding:3px 6px; background:var(--surface); color:var(--ink)}
+input.fin-oto:focus{outline:none; border-color:var(--good); box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 30%,transparent)}
 .pgr{display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:10px; font-size:12px; color:var(--ink-2)}
 .pgr button{border:1px solid var(--hair-strong); background:var(--surface); border-radius:7px; padding:4px 10px; color:var(--ink-2)}
 .pgr button:disabled{opacity:.4; cursor:default}

@@ -8,6 +8,17 @@ const ORD = PL.ord.map(r => { const o = {}; PL.ordCols.forEach((c,i)=>o[c]=r[i])
 const ITM = PL.itm.map(r => { const o = {}; PL.itmCols.forEach((c,i)=>o[c]=r[i]); o.mon = o.ds ? o.ds.slice(0,7) : null; return o; });
 const CH = ['Ticimax','Yemeksepeti','Trendyol'];
 const CH_COL = { Ticimax:'--s1', Yemeksepeti:'--s2', Trendyol:'--s3' };
+
+/* FİNAL — SMM (satılan malın maliyeti) oranı: ciro × oran (kanal bazlı) */
+const SMM_RATE = { Ticimax:0.20, Yemeksepeti:0.35, Trendyol:0.35 };
+const SMM_DEF  = 0.30;   // tanımsız kanal için
+/* Aylık TÜİK TÜFE (bir önceki aya göre %) — boot.js analytics_payload'tan doldurur */
+const TUFE = (window.__TUFE__ && window.__TUFE__.monthly) || {};
+/* "Oto masrafları" — manuel, tarayıcıda saklanır (dim: 'ch' | 'store') */
+const _otoKey = (dim,row,mon) => `eta.final.oto.${dim}.${row}.${mon}`;
+function otoGet(dim,row,mon){ try{ return +localStorage.getItem(_otoKey(dim,row,mon))||0; }catch(e){ return 0; } }
+function otoSet(dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_otoKey(dim,row,mon),String(val)) : localStorage.removeItem(_otoKey(dim,row,mon)); }catch(e){} }
+function parseTRNum(s){ s=String(s).replace(/[₺\s]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'); const n=parseFloat(s); return isFinite(n)?n:0; }
 const MONTHS_TR = {'01':'Oca','02':'Şub','03':'Mar','04':'Nis','05':'May','06':'Haz','07':'Tem','08':'Ağu','09':'Eyl','10':'Eki','11':'Kas','12':'Ara'};
 const WEEK = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
 const hourLbl = h => String(h).padStart(2,'0')+':00';   // 7 -> "07:00"
@@ -701,6 +712,7 @@ function turkeyMapSVG(rows){
 /* ============ BÖLÜMLER ============ */
 const SECTIONS=[
   {grp:'ÖZET', items:[['genel','Genel Bakış','▨']]},
+  {grp:'FİNAL', items:[['final','Final — Kâr / Zarar','◈']]},
   {grp:'SATIŞ', items:[['ciro','Ciro & Kümülatif','₺'],['siparis','Sipariş & Adet','#']]},
   {grp:'OPERASYON', items:[['teslimat','Teslimatlar','⇲'],['zaman','Sipariş & Teslim Saati','◔']]},
   {grp:'MÜŞTERİ', items:[['musteri','Müşteri / CRM','☺']]},
@@ -710,7 +722,7 @@ const SECTIONS=[
   {grp:'VERİ', items:[['veri','Ham Veri & Dışa Aktar','⤓']]}
 ];
 const TITLES=Object.fromEntries(SECTIONS.flatMap(s=>s.items.map(i=>[i[0],i[1]])));
-const GRP_COL={'ÖZET':'--accent','SATIŞ':'--s1','OPERASYON':'--s4','MÜŞTERİ':'--s5','DAĞITIM':'--s3','KAYNAK':'--s7','MATRİS':'--s2','VERİ':'--muted'};
+const GRP_COL={'ÖZET':'--accent','FİNAL':'--good','SATIŞ':'--s1','OPERASYON':'--s4','MÜŞTERİ':'--s5','DAĞITIM':'--s3','KAYNAK':'--s7','MATRİS':'--s2','VERİ':'--muted'};
 
 function kpi(k,v,s,cls){ return `<div class="kpi"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>${s?`<div class="s ${cls||''}">${esc(s)}</div>`:''}</div>`; }
 function kpirow(html){ const d=document.createElement('div'); d.className='kpirow'; d.innerHTML=html; return d; }
@@ -939,6 +951,82 @@ RENDERERS.genel=(v)=>{
       rowFmt:Object.assign(x=>x,{label:'Mağaza'}), colFmt:F.mon, fmt:F.tl})));
 
   v.appendChild(panel('Sipariş yoğunluğu — haftanın günü × saat','Sipariş sayısı', heatDayHour(O), {mail:true}));
+};
+
+/* ============ FİNAL — Kâr / Zarar ============ */
+function finRows(O, dim){
+  const D=O.filter(deliv);
+  const m=new Map();
+  for(const o of D){
+    const rv=o[dim], mon=o.mon; if(!rv||!mon) continue;
+    const k=rv+'|'+mon; let r=m.get(k);
+    if(!r){ r={rv,mon,ciro:0,smm:0,kom:0}; m.set(k,r); }
+    r.ciro+=o.ciro||0;
+    r.smm +=(o.ciro||0)*(SMM_RATE[o.ch]!=null?SMM_RATE[o.ch]:SMM_DEF);
+    r.kom +=o.kom||0;
+  }
+  const tot=new Map();
+  for(const r of m.values()) tot.set(r.rv,(tot.get(r.rv)||0)+r.ciro);
+  const ord=[...tot.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+  return [...m.values()]
+    .map(r=>{ const oto=otoGet(dim,r.rv,r.mon), gid=r.kom+oto;
+      return {...r, oto, gid, kz:r.ciro-r.smm-gid, enf:TUFE[r.mon]}; })
+    .sort((a,b)=> ord.indexOf(a.rv)-ord.indexOf(b.rv) || (a.mon<b.mon?1:a.mon>b.mon?-1:0));
+}
+function finTable(O, dim, label){
+  const rows=finRows(O,dim);
+  const w=document.createElement('div');
+  if(!rows.length){ w.className='miss'; w.textContent='Veri yok'; return w; }
+  const T=rows.reduce((a,r)=>{ a.ciro+=r.ciro;a.smm+=r.smm;a.kom+=r.kom;a.oto+=r.oto;a.gid+=r.gid;a.kz+=r.kz; return a; },
+                      {ciro:0,smm:0,kom:0,oto:0,gid:0,kz:0});
+  const kzc=x=> x>=0?'color:var(--good)':'color:var(--crit)';
+  let h=`<div class="tbl-scroll"><table class="dt fin"><thead><tr>`+
+    `<th>${esc(label)}</th><th>Ay</th><th>Ciro</th><th>SMM</th><th>Komisyon</th>`+
+    `<th>Oto masrafı</th><th>Giderler</th><th>Enf. %</th><th>Kâr / Zarar</th></tr></thead><tbody>`;
+  let prev=null;
+  rows.forEach(r=>{
+    const first = r.rv!==prev; prev=r.rv;
+    h+=`<tr${first?' class="fin-grp"':''}>`+
+      `<td>${first?esc(r.rv):''}</td>`+
+      `<td class="num">${esc(F.mon(r.mon))}</td>`+
+      `<td class="num">${esc(F.tl(r.ciro))}</td>`+
+      `<td class="num">${esc(F.tl(r.smm))}</td>`+
+      `<td class="num">${esc(F.tl(r.kom))}</td>`+
+      `<td class="num"><input class="fin-oto" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.oto?esc(F.n(r.oto)):''}" placeholder="0"></td>`+
+      `<td class="num">${esc(F.tl(r.gid))}</td>`+
+      `<td class="num">${r.enf!=null?esc(F.n1(r.enf))+'%':'—'}</td>`+
+      `<td class="num" style="${kzc(r.kz)};font-weight:700">${esc(F.tl(r.kz))}</td></tr>`;
+  });
+  h+=`</tbody><tfoot><tr><td>Toplam</td><td></td>`+
+    `<td class="num">${esc(F.tl(T.ciro))}</td><td class="num">${esc(F.tl(T.smm))}</td>`+
+    `<td class="num">${esc(F.tl(T.kom))}</td><td class="num">${esc(F.tl(T.oto))}</td>`+
+    `<td class="num">${esc(F.tl(T.gid))}</td><td class="num">—</td>`+
+    `<td class="num" style="${kzc(T.kz)};font-weight:800">${esc(F.tl(T.kz))}</td></tr></tfoot></table></div>`;
+  w.innerHTML=h;
+  w.querySelectorAll('input.fin-oto').forEach(inp=>{
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
+    inp.addEventListener('change',()=>{ otoSet(dim, inp.dataset.rv, inp.dataset.mon, parseTRNum(inp.value)); render(); });
+  });
+  return w;
+}
+RENDERERS.final=(v)=>{
+  const O=fO();
+  const R=finRows(O,'ch');
+  const T=R.reduce((a,r)=>{ a.ciro+=r.ciro;a.smm+=r.smm;a.gid+=r.gid;a.kz+=r.kz; return a; },{ciro:0,smm:0,gid:0,kz:0});
+  v.appendChild(kpirow(
+    kpi('Ciro (teslim edilen)',F.tl(T.ciro),F.mon(PL.meta.minDate)+' →')+
+    kpi('SMM',F.tl(T.smm),'Ticimax %20 · YS/Trendyol %35')+
+    kpi('Giderler',F.tl(T.gid),'komisyon + oto masrafı')+
+    kpi('Kâr / Zarar',F.tl(T.kz), T.kz>=0?'kâr':'zarar', T.kz>=0?'up':'down')
+  ));
+  const nt=document.createElement('div'); nt.className='note';
+  nt.innerHTML='<b>SMM</b> = ciro × oran (Ticimax %20, Yemeksepeti %35, Trendyol %35). '+
+    '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b> hücresine yazıp <b>Enter</b> — bu tarayıcıda saklanır. '+
+    '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı). '+
+    '<b>Enf. %</b> TÜİK aylık TÜFE — bilgi amaçlı, kâr/zarara dahil değildir.';
+  v.appendChild(nt);
+  v.appendChild(panel('Pazaryerine göre — aylık kâr / zarar','Satır: pazaryeri × ay (en yeni ay üstte)', finTable(O,'ch','Pazaryeri')));
+  v.appendChild(panel('Mağazaya göre — aylık kâr / zarar','Satır: mağaza × ay (en yeni ay üstte)', finTable(O,'store','Mağaza')));
 };
 
 RENDERERS.ciro=(v)=>{
@@ -1355,7 +1443,7 @@ function buildNav(){
   document.getElementById('nav').innerHTML=SECTIONS.map(s=>{
     const gc=`--gc:var(${GRP_COL[s.grp]||'--accent'})`;
     return `<div class="grp" style="${gc}">${s.grp}</div>`+s.items.map(i=>
-      `<a class="navobj" href="#/${i[0]}" data-k="${i[0]}" style="${gc}"><span class="ic">${i[2]}</span><span class="lbl">${i[1]}</span></a>`).join('');
+      `<a class="navobj${i[0]==='final'?' navobj-fin':''}" href="#/${i[0]}" data-k="${i[0]}" style="${gc}"><span class="ic">${i[2]}</span><span class="lbl">${i[1]}</span></a>`).join('');
   }).join('');
   const srcNames=(PL.meta.sources&&PL.meta.sources.length?PL.meta.sources:CH);
   const bs=document.getElementById('brandSrc');

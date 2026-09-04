@@ -32,6 +32,11 @@ supabase/
   parçaları birleştirip gunzip eder. Tek seferlik elle kurulum: `npm run rebuild`.
 - **Canlı çekim penceresi:** Pano arşivden geldiği için `TICIMAX_FETCH_DAYS` küçük olabilir
   (varsayılan 30) — canlı çekim yalnız `raw_orders`'ı güncel tutar.
+- **FİNAL segmenti (kâr / zarar):** Pazaryeri × ay ve mağaza × ay tabloları. SMM = ciro ×
+  oran (Ticimax %20, Yemeksepeti/Trendyol %35), komisyon API'lerden, "oto masrafı" elle
+  (tarayıcıda `localStorage`), Kâr/Zarar = Ciro − SMM − (Komisyon + Oto masrafı). "Enf. %"
+  sütunu aylık TÜİK TÜFE'dir: `scripts/lib/tufe.js` TCMB EVDS'ten (`EVDS_API_KEY`) çekip
+  `analytics_payload` içinde `id='tufe'` satırına yazar; anahtar yoksa gömülü tablo kullanılır.
 - **Kimlik doğrulama:** Supabase Auth (e‑posta + parola). Oturum yoksa giriş kapısı çıkar.
 - **RLS:** `analytics_payload` ve `raw_orders` yalnızca `authenticated` rolüne `select` verir.
   Yazma yalnızca `service_role` (topla / rebuild betiği) ile.
