@@ -48,9 +48,13 @@ function parseAny(v) {
 
 // ---------- metin normalizasyonu ----------
 // STORE_NAMES env: "ni1e=Güzeloba; us58=Liman; 33841=Merkez"  (kod → dostane ad)
+// Ortam değişkeni boşsa repoya gömülü varsayılan eşleme kullanılır (store-names.js).
+let DEFAULT_STORE_NAMES = '';
+try { ({ DEFAULT_STORE_NAMES } = require('./store-names')); } catch (e) { /* tarayıcı kopyasında yok */ }
 const STORE_MAP = (() => {
   const m = {};
-  String((typeof process !== 'undefined' && process.env && process.env.STORE_NAMES) || '')
+  const envVal = (typeof process !== 'undefined' && process.env && process.env.STORE_NAMES) || '';
+  String(envVal.trim() ? envVal : DEFAULT_STORE_NAMES)
     .split(/[;\n]+/).forEach((pair) => {
       const i = pair.indexOf('=');
       if (i > 0) { const k = pair.slice(0, i).trim().toLowerCase(); const v = pair.slice(i + 1).trim(); if (k && v) m[k] = v; }
