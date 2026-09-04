@@ -93,6 +93,13 @@ button{font:inherit; cursor:pointer}
   padding:8px 12px; border-radius:9px; background:var(--brand-grad); color:#fff;
   font-size:11.5px; box-shadow:0 2px 10px rgba(0,0,0,.22)}
 .heat-note b{font-weight:800}
+.hh-top{margin-top:10px; display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--ink-2)}
+.hh-top-lbl{font-weight:800; text-transform:uppercase; letter-spacing:.06em; font-size:10px; color:var(--muted)}
+.hh-top-row{display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px;
+  padding:6px 9px; border-radius:8px; background:var(--surface-2); border-left:3px solid var(--crit)}
+.hh-red{color:var(--crit); font-weight:800}
+.hh-top-ch{display:inline-flex; flex-wrap:wrap; gap:4px 10px; color:var(--ink); font-weight:600}
+.hh-top-ch i{width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:4px; vertical-align:-1px}
 .heat-note .hn-lbl{font-weight:800; text-transform:uppercase; letter-spacing:.06em; font-size:10px; opacity:.92}
 /* grafiği e-posta ile gönder */
 .pmail{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px; padding-top:11px; border-top:1px dashed var(--panel-line)}
@@ -285,13 +292,13 @@ table.dt tfoot td{font-weight:700; border-top:2px solid var(--hair-strong); bord
 .trll-svg{position:absolute; inset:0; overflow:visible}
 .trll-line{fill:none; stroke:#fff; stroke-width:1.8; opacity:.9; filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
 .trll-dot{fill:#7cffb2; stroke:#0b0f16; stroke-width:1}
-.trll-lbl{display:inline-block; font:700 12px/1.2 "IBM Plex Sans",system-ui,sans-serif;
-  padding:4px 8px; background:rgba(9,13,22,.86); border:1px solid rgba(255,255,255,.2);
+.trll-lbl{display:inline-block; box-sizing:border-box; height:30px; overflow:hidden;
+  font:700 11px/1.18 "IBM Plex Sans",system-ui,sans-serif;
+  padding:3px 7px; background:rgba(9,13,22,.88); border:1px solid rgba(255,255,255,.22);
   border-radius:7px; box-shadow:0 4px 14px rgba(0,0,0,.45); white-space:nowrap}
 .trll-lbl.l{float:right}
 .trll-lbl .n{display:block; color:#fff}
-.trll-lbl .c{display:block; color:#7cffb2}
-.trll-lbl .s{display:block; font-weight:600; font-size:10.5px; color:#ffce6b}
+.trll-lbl .c{display:block; font-weight:600; font-size:10px; color:#7cffb2}
 .leaflet-control-layers{background:var(--surface); color:var(--ink-2);
   border:1px solid var(--hair-strong); border-radius:9px; box-shadow:var(--shadow); padding:6px 8px}
 .leaflet-control-layers-list{font-size:12.5px; font-weight:600}

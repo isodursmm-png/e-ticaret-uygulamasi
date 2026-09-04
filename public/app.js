@@ -516,35 +516,48 @@ function addLeaderLabels(map, items){
     const sz=map.getSize();
     svg.setAttribute('width',sz.x); svg.setAttribute('height',sz.y);
     while(svg.firstChild) svg.removeChild(svg.firstChild);
-    const cx=sz.x/2, M=6;
-    const pts=items.map(it=>{ const p=map.latLngToContainerPoint([it.lat,it.lng]);
-      const tw=Math.max(String(it.name).length, (it.ciroTxt+'  '+it.sipTxt).length)*6.6+16;
-      return {...it, x:p.x, y:p.y, w:tw, h:44}; }).sort((a,b)=>a.y-b.y);
-    const placed={ '-1':[], '1':[] };
-    const LEN=40, GAP=8;
-    pts.forEach(it=>{
-      const side = it.x>cx ? -1 : 1;
-      const arr=placed[side];
-      let ly=it.y-it.h/2;
-      for(let i=0;i<arr.length;i++){ const r=arr[i];
-        if(ly < r.y+r.h+GAP && ly+it.h+GAP > r.y){ ly=r.y+r.h+GAP; i=-1; } }
-      // etiketi harita kutusunun içine sıkıştır — kenardan taşmasın
-      ly = Math.max(M, Math.min(ly, sz.y - it.h - M));
-      let lx = side<0 ? it.x - it.r - LEN - it.w : it.x + it.r + LEN;
-      lx = Math.max(M, Math.min(lx, sz.x - it.w - M));
-      arr.push({y:ly,h:it.h});
-      const x0=it.x + side*(it.r+2), x1=(side<0?lx+it.w:lx), y1=ly+it.h/2;
-      const path=el('path');
-      path.setAttribute('d',`M${x0},${it.y} L${x0+side*10},${it.y} L${x1-side*8},${y1} L${x1},${y1}`);
-      path.setAttribute('class','trll-line'); svg.appendChild(path);
-      const dot=el('circle'); dot.setAttribute('cx',x1); dot.setAttribute('cy',y1);
-      dot.setAttribute('r',2.6); dot.setAttribute('class','trll-dot'); svg.appendChild(dot);
-      const fo=el('foreignObject');
-      fo.setAttribute('x',lx); fo.setAttribute('y',ly); fo.setAttribute('width',it.w); fo.setAttribute('height',it.h);
-      fo.innerHTML=`<div xmlns="http://www.w3.org/1999/xhtml" class="trll-lbl ${side<0?'l':'r'}">`+
-        `<span class="n">${esc(it.name)}</span><span class="c">${esc(it.ciroTxt)}</span>`+
-        `<span class="s">${esc(it.sipTxt)}</span></div>`;
-      svg.appendChild(fo);
+    const cx=sz.x/2, M=8, LEN=34, GAP=6, H=30;
+    const maxPerSide=Math.max(1, Math.floor((sz.y-2*M)/(H+GAP)));
+
+    let pts=items.map(it=>{ const p=map.latLngToContainerPoint([it.lat,it.lng]);
+      const txt=it.ciroTxt+' · '+it.sipTxt;
+      const w=Math.min(sz.x*0.34, Math.max(String(it.name).length, txt.length)*6.4+14);
+      return {...it, x:p.x, y:p.y, w, h:H, txt, pri:(it.ciro||it.r||0) }; })
+      .sort((a,b)=>b.pri-a.pri);
+
+    // taraf ata: geometri + denge (bir taraf dolunca diğerine)
+    const cnt={ '-1':0, '1':0 };
+    pts.forEach(it=>{ let s=it.x>cx?-1:1;
+      if(cnt[s]>=maxPerSide && cnt[-s]<maxPerSide) s=-s;
+      it.side=s; cnt[s]++; });
+
+    [-1,1].forEach(side=>{
+      const arr=pts.filter(it=>it.side===side).slice(0,maxPerSide).sort((a,b)=>a.y-b.y);
+      // 1) aşağı it (çakışma yok)
+      let prevB=-1e9;
+      arr.forEach(it=>{ it.ly=Math.max(it.y-it.h/2, prevB+GAP); prevB=it.ly+it.h; });
+      // 2) alttan taşarsa yukarı doğru düzelt
+      if(prevB > sz.y-M){
+        let nextT=sz.y-M;
+        for(let i=arr.length-1;i>=0;i--){
+          arr[i].ly=Math.max(M, Math.min(arr[i].ly, nextT-arr[i].h));
+          nextT=arr[i].ly-GAP;
+        }
+      }
+      arr.forEach(it=>{
+        const lx = side<0 ? Math.max(M, it.x-it.r-LEN-it.w) : Math.min(sz.x-it.w-M, it.x+it.r+LEN);
+        const x0=it.x+side*(it.r+2), x1=(side<0?lx+it.w:lx), y1=it.ly+it.h/2;
+        const path=el('path');
+        path.setAttribute('d',`M${x0},${it.y} L${x0+side*10},${it.y} L${x1-side*8},${y1} L${x1},${y1}`);
+        path.setAttribute('class','trll-line'); svg.appendChild(path);
+        const dot=el('circle'); dot.setAttribute('cx',x1); dot.setAttribute('cy',y1);
+        dot.setAttribute('r',2.6); dot.setAttribute('class','trll-dot'); svg.appendChild(dot);
+        const fo=el('foreignObject');
+        fo.setAttribute('x',lx); fo.setAttribute('y',it.ly); fo.setAttribute('width',it.w); fo.setAttribute('height',it.h);
+        fo.innerHTML=`<div xmlns="http://www.w3.org/1999/xhtml" class="trll-lbl ${side<0?'l':'r'}">`+
+          `<span class="n">${esc(it.name)}</span><span class="c">${esc(it.txt)}</span></div>`;
+        svg.appendChild(fo);
+      });
     });
   }
   const onMove=()=>draw();
@@ -604,9 +617,9 @@ function turkeyMapLeaflet(rows){
       const mk = L.circleMarker([la,lo], { radius:rad, color:'#fff', weight:1.6, fillColor:acc, fillOpacity:0.6 });
       mk.bindPopup(`<b>${esc(r.il)}</b><br>${F.tl(r.ciro)} ciro · ${F.n(r.sip)} sipariş · ${F.n(r.adet)} adet`);
       mk.addTo(map);
-      labelItems.push({ lat:la, lng:lo, r:rad, name:r.il, ciroTxt:F.tl(r.ciro), sipTxt:F.n(r.sip)+' sipariş' });
+      labelItems.push({ lat:la, lng:lo, r:rad, ciro:r.ciro, name:r.il, ciroTxt:F.tl(r.ciro), sipTxt:F.n(r.sip)+' sipariş' });
     }
-    const ll = addLeaderLabels(map, labelItems.slice(0, 14));   // en çok cirolu 14 il etiketlenir
+    const ll = addLeaderLabels(map, labelItems.slice(0, 22));   // draw() yüksekliğe göre otomatik kırpar
     map.on('unload', ()=>ll.remove());
     setTimeout(()=>{ fitTR(); ll.draw(); }, 80);
     try{ new ResizeObserver(()=>{ map.invalidateSize(); ll.draw(); }).observe(el); }catch(e){}
@@ -722,6 +735,25 @@ function heatDayHour(O){
     `<span>En yoğun gün: <b>${esc(bestDay.d)}</b> · ${F.n(bestDay.v)}</span>`+
     `<span>En yoğun saat: <b>${hh(bestHour.h)}</b> · ${F.n(bestHour.v)}</span>`;
   wrap.appendChild(note); wrap.appendChild(el);
+
+  // En yüksek 3 dilim (haritada kırmızı) — hangi tarih, hangi pazaryeri
+  const ranked=[];
+  days.forEach((d,ri)=>hours.forEach((h,ci)=>{ if(M[ri][ci]>0) ranked.push({d,h,v:M[ri][ci]}); }));
+  ranked.sort((a,b)=>b.v-a.v);
+  const top3=ranked.slice(0,3);
+  if(top3.length){
+    const box=document.createElement('div'); box.className='hh-top';
+    box.innerHTML=`<span class="hh-top-lbl">En yoğun 3 dilim</span>`+top3.map(t=>{
+      const cell=O.filter(o=>o.wd===t.d && o.hr===t.h);
+      const chTxt=CH.filter(c=>cell.some(o=>o.ch===c))
+        .map(c=>`<i style="background:${CV(CH_COL[c])}"></i>${esc(c)} ${F.n(cell.filter(o=>o.ch===c).length)}`).join(' ');
+      const byDate=[...groupSum(cell,o=>o.ds,()=>1).entries()].sort((a,b)=>b[1]-a[1])[0];
+      return `<span class="hh-top-row"><b class="hh-red">${esc(t.d)} ${hh(t.h)}</b> · ${F.n(t.v)} sipariş`+
+        `${byDate?` · en yoğun ${esc(F.d(byDate[0]))} (${F.n(byDate[1])})`:''}`+
+        `<span class="hh-top-ch">${chTxt}</span></span>`;
+    }).join('');
+    wrap.appendChild(box);
+  }
   return wrap;
 }
 function storeAgg(O){
