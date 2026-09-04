@@ -1145,7 +1145,7 @@ RENDERERS.kategori=(v)=>{
     barH(topEntries(brand,14).filter(([k])=>k!=='Diğer').map(([k,vv])=>({label:k,value:vv,color:PAL['--s3']})),{fmt:F.n})));
   g.appendChild(panel('En çok satan ürünler',null,
     dataTable([
-      {key:'prod',label:'Ürün'},{key:'ch',label:'Kanal'},{key:'qty',label:'Adet',fmt:F.n,def:true},{key:'amt',label:'Ciro',fmt:F.tl}
+      {key:'prod',label:'Ürün'},{key:'ch',label:'Kanal'},{key:'qty',label:'Adet',fmt:F.n},{key:'amt',label:'Ciro',fmt:F.tl,def:true}
     ], (()=>{ const m=new Map();
       for(const x of I){ if(!x.prod) continue; const k=x.prod+'|'+x.ch; let r=m.get(k); if(!r){ r={prod:x.prod,ch:x.ch,qty:0,amt:0}; m.set(k,r); } r.qty+=x.qty; r.amt+=x.amt; }
       return [...m.values()]; })(),{per:15,shade:['qty','amt']})));
