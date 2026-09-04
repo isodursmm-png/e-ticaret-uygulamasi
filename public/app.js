@@ -183,7 +183,9 @@ function statusByChannel(O){
 
 function barV(cats, series, {fmt=F.n, stacked=true, catFmt=(x=>x), note=null, values=false}={}){
   if(!cats.length || !series.length) return miss();
-  const W=780, H=290, padL=58, padR=12, padT=14, padB=40;
+  // çok sayıda kategori (günlük tarih / saat) → x ekseni etiketleri dikey
+  const rotX = cats.length>14;
+  const W=780, H=290, padL=58, padR=12, padT=14, padB=rotX?66:40;
   const iw=W-padL-padR, ih=H-padT-padB;
   const totals=cats.map((_,ci)=> stacked ? sum(series,se=>se.values[ci]||0) : Math.max(...series.map(se=>se.values[ci]||0),0));
   const max=Math.max(...totals,1);
@@ -215,7 +217,9 @@ function barV(cats, series, {fmt=F.n, stacked=true, catFmt=(x=>x), note=null, va
     const tot=stacked?acc:Math.max(...series.map(se=>se.values[ci]||0),0);
     const rows=series.map(se=>`<div><span class='sw' style='background:${se.color}'></span>${esc(se.name)}: <b>${esc(fmt(se.values[ci]||0))}</b></div>`).join('');
     s+=`<rect class="hb" x="${padL+step*ci}" y="${padT}" width="${step}" height="${ih}" fill="transparent" data-html="<b>${esc(catFmt(c))}</b>${series.length>1?'<br>Toplam: <b>'+esc(fmt(tot))+'</b>':''}<br>${rows.replace(/"/g,'&quot;')}"/>`;
-    s+=`<text x="${cx}" y="${H-padB+16}" text-anchor="middle" font-size="11.5" font-weight="600" fill="${PAL['--ink-2']}">${esc(catFmt(c))}</text>`;
+    if(rotX){ const ty=padT+ih+8;
+      s+=`<text x="${cx}" y="${ty}" text-anchor="end" transform="rotate(-90 ${cx} ${ty})" font-size="10" font-weight="600" fill="${PAL['--ink-2']}">${esc(catFmt(c))}</text>`;
+    } else s+=`<text x="${cx}" y="${H-padB+16}" text-anchor="middle" font-size="11.5" font-weight="600" fill="${PAL['--ink-2']}">${esc(catFmt(c))}</text>`;
   });
   s+=`<line x1="${padL}" x2="${W-padR}" y1="${padT+ih}" y2="${padT+ih}" stroke="${PAL['--hair-strong']}"/>`;
   if(note && note.rows && note.rows.length){
