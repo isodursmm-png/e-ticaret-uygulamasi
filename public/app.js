@@ -461,6 +461,7 @@ function pivot(O, {rowKey, colKey, metric, rowTop=26, colTop=18, rowFmt=(x=>x), 
   let cl;
   if(['ds','mon','wd','hr'].includes(colKey)){
     cl=[...colsMap.keys()].sort((a,b)=> colKey==='wd' ? WEEK.indexOf(a)-WEEK.indexOf(b) : String(a).localeCompare(String(b),undefined,{numeric:true}));
+    if(colKey==='ds'||colKey==='mon') cl.reverse();   // en yeni tarih solda (büyükten küçüğe)
   } else {
     cl=[...colsMap.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]).slice(0,colTop);
   }
