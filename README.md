@@ -20,16 +20,21 @@ supabase/
 ```
 
 ## Mimari
-- **Statik + Supabase** (sunucusuz). Pano tüm veriyi tek seferde alıp istemcide filtreler;
-  bu yüzden veri, `analytics_payload` tablosunda **tek bir `jsonb` satırı** (`id = 'eticaret'`)
-  olarak tutulur. `import.js` bu satırı `service_role` anahtarıyla günceller.
-- **Ham satış arşivi:** `topla.js` (canlı toplama) ayrıca `raw_orders` tablosunu besler.
-  `analytics_payload` her koşuda ezilirken `raw_orders` **birikir** — her çalıştırmada yeni
-  sipariş/kalem satırları `key` üzerinden upsert edilir (yeni → INSERT, görülen → UPDATE).
-  Kapatmak için `RAW_ORDERS=0` ya da `--no-raw`.
+- **Statik + Supabase** (sunucusuz). Pano tüm veriyi tek seferde alıp istemcide filtreler.
+- **Ham satış arşivi (`raw_orders`):** `topla.js` her koşuda kaynaklardan gelen satırları
+  `key` üzerinden upsert eder (yeni → INSERT, görülen → UPDATE) — **birikir**, silinmez.
+  2023-12'den bugüne tüm Ticimax geçmişi burada (Yemeksepeti/Trendyol API'leri son ~60 gün).
+- **Pano payload'ı (`analytics_payload`):** `topla.js`, `raw_orders`'ın **tamamından**
+  `buildPayload` ile kurar. Kalem satırları ay bazında toplanır; ~111 MB ham → ~20 MB gzip
+  → base64 **~3 MB'lık parçalara** bölünüp birden çok satıra yazılır:
+  `id='eticaret'` (manifest `{__chunks:N}` + `geo` + `meta`) ve `id='eticaret~p0..N'`
+  (`{__part:'<b64>'}`). Tek satır/istek ~5 MB Supabase sınırını böyle aşarız; `boot.js`
+  parçaları birleştirip gunzip eder. Tek seferlik elle kurulum: `npm run rebuild`.
+- **Canlı çekim penceresi:** Pano arşivden geldiği için `TICIMAX_FETCH_DAYS` küçük olabilir
+  (varsayılan 30) — canlı çekim yalnız `raw_orders`'ı güncel tutar.
 - **Kimlik doğrulama:** Supabase Auth (e‑posta + parola). Oturum yoksa giriş kapısı çıkar.
 - **RLS:** `analytics_payload` ve `raw_orders` yalnızca `authenticated` rolüne `select` verir.
-  Yazma yalnızca `service_role` (import / topla betiği) ile.
+  Yazma yalnızca `service_role` (topla / rebuild betiği) ile.
 
 ---
 
