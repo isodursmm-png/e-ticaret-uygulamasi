@@ -318,7 +318,7 @@ function donut(items, {fmt=F.n, unitTotal=null}={}){
   return wrap;
 }
 
-function heat(rowLabels, colLabels, matrix, {fmt=F.n, colFmt=(x=>x)}={}){
+function heat(rowLabels, colLabels, matrix, {fmt=F.n, colFmt=(x=>x), allVals=false}={}){
   if(!rowLabels.length || !colLabels.length) return miss();
   const cw=Math.max(28, Math.min(54, 620/colLabels.length)), rhh=26;
   const lblW=Math.min(160, 56+Math.max(...rowLabels.map(l=>String(l).length))*6.4);
@@ -338,7 +338,7 @@ function heat(rowLabels, colLabels, matrix, {fmt=F.n, colFmt=(x=>x)}={}){
       const v=matrix[ri][ci]||0, t=v/max, isRed=red.has(ri+'_'+ci);
       const fill=isRed ? crit : (v?mix(PAL['--heat-0'],PAL['--heat-1'],0.12+t*0.88):PAL['--surface-2']);
       s+=`<rect x="${lblW+ci*cw}" y="${34+ri*rhh}" width="${cw-2}" height="${rhh-2}" rx="2" fill="${fill}"${isRed?' stroke="#fff" stroke-width="1"':''} class="rowh" data-t="${esc(rl)} · ${esc(colFmt(cl))}||${esc(fmt(v))}"/>`;
-      if(isRed || t>0.16) s+=`<text x="${lblW+ci*cw+cw/2-1}" y="${34+ri*rhh+rhh/2+4}" text-anchor="middle" font-size="9.5" font-weight="${isRed?'800':'400'}" fill="${(isRed||t>0.55)?'#fff':PAL['--ink-2']}" style="font-variant-numeric:tabular-nums">${esc(fmt(v))}</text>`;
+      if(v>0 && (isRed || allVals || t>0.16)) s+=`<text x="${lblW+ci*cw+cw/2-1}" y="${34+ri*rhh+rhh/2+4}" text-anchor="middle" font-size="9.5" font-weight="${isRed?'800':'400'}" fill="${(isRed||t>0.55)?'#fff':PAL['--ink-2']}" style="font-variant-numeric:tabular-nums">${esc(fmt(v))}</text>`;
     });
   });
   s+=`</svg>`;
@@ -1020,9 +1020,14 @@ RENDERERS.zaman=(v)=>{
   g.appendChild(panel('Sipariş saati dağılımı','Kanal kırılımı', barV(range(0,23),seriesByCh(O,range(0,23),'hr',()=>1),{fmt:F.n})));
   g.appendChild(panel('Teslim saati dağılımı',null,
     barV(range(0,23),[{name:'Teslimat',color:PAL['--accent'],values:range(0,23).map(h=>O.filter(o=>o.dh===h).length)}],{fmt:F.n})));
-  g.appendChild(panel('Tarih × saat yoğunluğu',null,(()=>{
-    const ds=catsDates(O), hs=range(7,23);
-    return heat(ds.map(F.d),hs,ds.map(d=>hs.map(h=>O.filter(o=>o.ds===d&&o.hr===h).length)),{fmt:F.n,colFmt:hourLbl});
+  g.appendChild(panel('Tarih × saat yoğunluğu','Tarih filtresinden bağımsız — son 30 gün',(()=>{
+    // her koşulda bugünden 30 gün geriye (yalnız kanal süzgeci uygulanır)
+    const hs=range(7,23);
+    const t0=new Date(); const ds=[];
+    for(let i=29;i>=0;i--){ const d=new Date(t0); d.setDate(t0.getDate()-i);
+      ds.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')); }
+    const src=ORD.filter(o=>S.ch.has(o.ch));
+    return heat(ds.map(F.d),hs,ds.map(d=>hs.map(h=>src.filter(o=>o.ds===d&&o.hr===h).length)),{fmt:F.n,colFmt:hourLbl,allVals:true});
   })()));
   g.appendChild(panel('Haftanın gününe göre ort. teslim süresi','saat',(()=>{
     const W=WEEK.filter(d=>O.some(o=>o.wd===d));
