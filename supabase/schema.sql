@@ -140,3 +140,36 @@ create policy "authenticated_all"
   to authenticated
   using (true)
   with check (true);
+
+-- ============================================================================
+--  YAKITLAR  —  araç × ay bazlı Petrol Ofisi yakıt özeti (kalıcı kayıt)
+--  ----------------------------------------------------------------------------
+--  api/yakit-sync.js (Vercel Cron, günlük) tarafından yazılır: her çalıştığında
+--  içinde bulunduğumuz ayın satırını o ana kadarki toplamlarla GÜNCELLER
+--  (arac_id + ay tekil) — böylece ay kapanana kadar veriler günlük birikir.
+--  Geçmiş aylar sabit kalır. Yazma yalnızca service_role ile; tarayıcı sadece
+--  okur (canlı "Çek" ekranındaki gibi anlık API çağrısı YOK, burada kayıtlı
+--  veri gösterilir).
+-- ============================================================================
+create table if not exists public.yakitlar (
+  id          bigint generated always as identity primary key,
+  arac_id     bigint      not null references public.araclar(id) on delete cascade,
+  ay          date        not null,        -- ayın ilk günü, ör. 2026-08-01
+  litre       numeric     not null default 0,
+  tutar       numeric     not null default 0,
+  islem       integer     not null default 0,
+  updated_at  timestamptz not null default now(),
+  unique (arac_id, ay)
+);
+
+create index if not exists yakitlar_ay_idx on public.yakitlar (ay);
+create index if not exists yakitlar_arac_id_idx on public.yakitlar (arac_id);
+
+alter table public.yakitlar enable row level security;
+
+drop policy if exists "read_authenticated" on public.yakitlar;
+create policy "read_authenticated"
+  on public.yakitlar
+  for select
+  to authenticated
+  using (true);

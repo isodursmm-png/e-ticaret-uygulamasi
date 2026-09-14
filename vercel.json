@@ -7,6 +7,10 @@
   "trailingSlash": false,
   "functions": {
     "api/refresh.js": { "maxDuration": 30 },
-    "api/yakit.js": { "maxDuration": 60 }
-  }
+    "api/yakit.js": { "maxDuration": 60 },
+    "api/yakit-sync.js": { "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/yakit-sync", "schedule": "0 18 * * *" }
+  ]
 }

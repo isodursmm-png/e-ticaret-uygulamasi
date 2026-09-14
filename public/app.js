@@ -20,7 +20,35 @@ const TUFE = (window.__TUFE__ && window.__TUFE__.monthly) || {};
 const _manKey = (field,dim,row,mon) => `eta.final.${field}.${dim}.${row}.${mon}`;
 function manGet(field,dim,row,mon){ try{ return +localStorage.getItem(_manKey(field,dim,row,mon))||0; }catch(e){ return 0; } }
 function manSet(field,dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_manKey(field,dim,row,mon),String(val)) : localStorage.removeItem(_manKey(field,dim,row,mon)); }catch(e){} }
-const otoGet=(dim,row,mon)=>manGet('oto',dim,row,mon), otoSet=(dim,row,mon,v)=>manSet('oto',dim,row,mon,v);
+/* Oto masrafı — public.yakitlar'dan otomatik (mağaza×ay: araclar.sube eşleşmesi;
+   pazaryeri×ay: yakıtın belirli bir pazaryeriyle ilişkisi olmadığından TÜM
+   araçların o ayki toplamı yalnızca "Ticimax" satırına yazılır). Senkron veri
+   olan hücreler salt-okunur olur; olmayan (ör. 2026 öncesi) hücrelerde elle
+   giriş eskisi gibi çalışmaya devam eder. */
+let YAKIT_BY_STORE_MON = new Map();   // "mağaza|YYYY-MM" -> tutar
+let YAKIT_BY_MON = new Map();         // "YYYY-MM" -> tutar (tüm araçlar toplamı)
+(async function loadYakitTotals(){
+  const sb = window.__SB__; if(!sb) return;
+  try{
+    const { data, error } = await sb.from('yakitlar').select('ay,tutar,araclar(sube)');
+    if(error || !data) return;
+    for(const r of data){
+      const mon=String(r.ay).slice(0,7), tutar=+r.tutar||0;
+      YAKIT_BY_MON.set(mon,(YAKIT_BY_MON.get(mon)||0)+tutar);
+      const sube=r.araclar && r.araclar.sube;
+      if(sube){ const k=sube+'|'+mon; YAKIT_BY_STORE_MON.set(k,(YAKIT_BY_STORE_MON.get(k)||0)+tutar); }
+    }
+    render();
+  }catch(e){ /* sessiz geç — Oto masrafı elle girilmiş haliyle kalır */ }
+})();
+function otoAutoVal(dim,row,mon){
+  if(dim==='store'){ const k=row+'|'+mon; if(YAKIT_BY_STORE_MON.has(k)) return YAKIT_BY_STORE_MON.get(k); }
+  if(dim==='ch' && row==='Ticimax' && YAKIT_BY_MON.has(mon)) return YAKIT_BY_MON.get(mon);
+  return null;
+}
+const otoGet=(dim,row,mon)=>{ const a=otoAutoVal(dim,row,mon); return a!=null ? a : manGet('oto',dim,row,mon); };
+const otoIsAuto=(dim,row,mon)=>otoAutoVal(dim,row,mon)!=null;
+const otoSet=(dim,row,mon,v)=>manSet('oto',dim,row,mon,v);
 const giderGet=(dim,row,mon)=>manGet('gider',dim,row,mon), giderSet=(dim,row,mon,v)=>manSet('gider',dim,row,mon,v);
 /* Enflasyonu Kâr/Zarar'a dahil et mi? [E]/[H] — global, tarayıcıda saklanır */
 const _enfKey='eta.final.enfDahil';
@@ -981,9 +1009,9 @@ function finRows(O, dim, enfDahil){
   for(const r of m.values()) tot.set(r.rv,(tot.get(r.rv)||0)+r.ciro);
   const ord=[...tot.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
   return [...m.values()]
-    .map(r=>{ const oto=otoGet(dim,r.rv,r.mon), other=giderGet(dim,r.rv,r.mon), gid=r.kom+oto+other, enf=TUFE[r.mon];
+    .map(r=>{ const oto=otoGet(dim,r.rv,r.mon), otoAuto=otoIsAuto(dim,r.rv,r.mon), other=giderGet(dim,r.rv,r.mon), gid=r.kom+oto+other, enf=TUFE[r.mon];
       const enfAdj = (enfDahil && enf!=null) ? r.ciro*enf/100 : 0;
-      return {...r, oto, other, gid, enf, enfAdj, kz:r.ciro-r.smm-gid-enfAdj}; })
+      return {...r, oto, otoAuto, other, gid, enf, enfAdj, kz:r.ciro-r.smm-gid-enfAdj}; })
     .sort((a,b)=> ord.indexOf(a.rv)-ord.indexOf(b.rv) || (a.mon<b.mon?1:a.mon>b.mon?-1:0));
 }
 function finTable(O, dim, label, enfDahil, storeFilter){
@@ -1006,7 +1034,7 @@ function finTable(O, dim, label, enfDahil, storeFilter){
       `<td class="num">${esc(F.tl(r.ciro))}</td>`+
       `<td class="num">${esc(F.tl(r.smm))}</td>`+
       `<td class="num">${esc(F.tl(r.kom))}</td>`+
-      `<td class="num"><input class="fin-oto" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.oto?esc(F.n(r.oto)):''}" placeholder="0"></td>`+
+      `<td class="num"><input class="fin-oto" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.oto?esc(F.n(r.oto)):''}" placeholder="0"${r.otoAuto?' readonly title="Petrol Ofisi\'nden otomatik (yakitlar tablosu)"':''}></td>`+
       `<td class="num"><input class="fin-oto fin-gider" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.other?esc(F.n(r.other)):''}" placeholder="0"></td>`+
       `<td class="num">${esc(F.tl(r.gid))}</td>`+
       `<td class="num">${r.enf!=null?esc(F.n1(r.enf))+'%'+(r.enfAdj>0?' <span class="fin-enfon" title="Kâr/Zarardan düşüldü">↓</span>':''):'—'}</td>`+
@@ -1049,7 +1077,7 @@ RENDERERS.final=(v)=>{
   v.appendChild(tog);
   const nt=document.createElement('div'); nt.className='note';
   nt.innerHTML='<b>SMM</b> = ciro × (1 − dilim). Dilim: Ticimax %20 → ×0,80, Yemeksepeti %35 → ×0,65, Trendyol %35 → ×0,65. '+
-    '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b> ve <b>Diğer gider</b> hücrelerine yazıp <b>Enter</b> — bu tarayıcıda saklanır. '+
+    '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b>: Petrol Ofisi verisi olan aylarda otomatik doldurulur ve salt-okunur olur (mağazada şubeye göre; pazaryerinde tek satırda Ticimax’a yazılır); veri olmayan ay/satırlarda elle girip <b>Enter</b>. <b>Diğer gider</b> her zaman elle girilir, <b>Enter</b> ile kaydedilir — bu tarayıcıda saklanır. '+
     '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı + Diğer gider)'+(enfDahil?' − (Ciro × Enf. %)':'')+'. '+
     '<b>Enf. %</b> aylık TÜİK TÜFE — [E]/[H] ile kâr/zarara dahil edilip edilmeyeceğini seçin (varsayılan: hayır, yalnız bilgi). '+
     '<span class="fin-open" style="margin-left:2px">ay kapanmadı</span> içinde bulunduğumuz ay için — rakamlar henüz kesinleşmedi.';
@@ -1130,13 +1158,13 @@ function renderAraclarPanel(v, sb){
   refresh();
 }
 
-/* ---- Yakıt Alımları: Petrol Ofisi (arac_takip_sistemi proxy) — api/yakit.js ---- */
+/* ---- Yakıt Alımları: public.yakitlar (Petrol Ofisi'nden api/yakit-sync.js'in günlük yazdığı kayıt) ---- */
 const AY_ADLARI=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 function renderYakitPanel(v, sb){
   const now=new Date();
   const curMonthVal=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
 
-  const panelEl=panel('Yakıt Alımları','Petrol Ofisi (arac_takip_sistemi) — seçilen ay için, yalnızca Araçlar listesindeki plakalar');
+  const panelEl=panel('Yakıt Alımları','Kayıtlı aylık özet (Petrol Ofisi, her gün otomatik güncellenir) — yalnızca Araçlar listesindeki plakalar');
   panelEl.insertAdjacentHTML('beforeend', `
     <form id="yakitForm" class="oto-form">
       <label>Ay<input type="month" name="ay" value="${curMonthVal}" required></label>
@@ -1150,15 +1178,6 @@ function renderYakitPanel(v, sb){
   panelEl.appendChild(listHost);
   v.appendChild(panelEl);
 
-  function ayAraligi(monthVal){
-    const [y,m]=monthVal.split('-').map(Number);
-    const start=`${monthVal}-01`;
-    const sonGun=new Date(y,m,0).getDate();
-    let end=`${monthVal}-${String(sonGun).padStart(2,'0')}`;
-    if(monthVal===curMonthVal) end=now.toISOString().slice(0,10);   // içinde bulunduğumuz ay: bugüne kadar
-    return { start, end, etiket:`${AY_ADLARI[m-1]} ${y}` };
-  }
-
   function renderKpi(byPlate, etiket){
     const litre=byPlate.reduce((a,r)=>a+(+r.litre||0),0);
     const tutar=byPlate.reduce((a,r)=>a+(+r.tutar||0),0);
@@ -1169,7 +1188,7 @@ function renderYakitPanel(v, sb){
       kpi('Toplam yakıt',F.n1(litre)+' L')+kpi('Toplam tutar',F.tl(tutar))+kpi('İşlem sayısı',F.n(islem));
   }
   function renderList(byPlate){
-    if(!byPlate.length){ listHost.innerHTML='<div class="miss">Araçlar listesi boş — önce bir araç ekleyin.</div>'; return; }
+    if(!byPlate.length){ listHost.innerHTML='<div class="miss">Bu ay için henüz kayıt yok — otomatik senkronizasyon her gün çalışır.</div>'; return; }
     let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
       `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Litre</th><th>Tutar</th><th>İşlem</th></tr></thead><tbody>`;
     byPlate.forEach(r=>{
@@ -1182,31 +1201,27 @@ function renderYakitPanel(v, sb){
   panelEl.querySelector('#yakitForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f=e.target;
-    const { start, end, etiket }=ayAraligi(f.elements.ay.value);
+    const monthVal=f.elements.ay.value;
+    const [y,m]=monthVal.split('-').map(Number);
+    const ayFirst=`${monthVal}-01`;
+    const etiket=`${AY_ADLARI[m-1]} ${y}`;
     const btn=f.querySelector('button[type=submit]');
-    kpiRow.innerHTML=''; listHost.innerHTML=''; monthLabel.textContent='';
-    const MAX_TRY=6;
+    kpiRow.innerHTML=''; listHost.innerHTML=''; monthLabel.textContent=''; btn.disabled=true;
     try{
-      const { data:{ session } }=await sb.auth.getSession();
-      if(!session) throw new Error('Oturum bulunamadı, tekrar giriş yapın.');
-
-      let j=null, lastErr=null;
-      for(let attempt=1; attempt<=MAX_TRY; attempt++){
-        btn.disabled=true;
-        btn.textContent=attempt===1 ? '⏳ Çekiliyor… (Render uykudaysa yavaş olabilir)' : `⏳ Tekrar deneniyor… (${attempt}/${MAX_TRY})`;
-        const r=await fetch(`/api/yakit?start=${start}&end=${end}`, { headers:{ Authorization:'Bearer '+session.access_token } });
-        const body=await r.json().catch(()=>({}));
-        if(r.ok && body.ok!==false){ j=body; break; }
-        lastErr=new Error(body.error||('HTTP '+r.status));
-        const retryable=body.retry===true || r.status===504;
-        if(!retryable || attempt===MAX_TRY) throw lastErr;
-        await new Promise(res=>setTimeout(res,4000));
-      }
-      renderKpi(j.byPlate||[], etiket); renderList(j.byPlate||[]);
+      const { data, error }=await sb.from('yakitlar')
+        .select('litre,tutar,islem,araclar(plaka,sube,sofor,kullanim)')
+        .eq('ay', ayFirst);
+      if(error) throw error;
+      const byPlate=(data||[]).map(r=>({
+        plaka:r.araclar&&r.araclar.plaka, sube:r.araclar&&r.araclar.sube,
+        sofor:r.araclar&&r.araclar.sofor, kullanim:r.araclar&&r.araclar.kullanim,
+        litre:r.litre, tutar:r.tutar, islem:r.islem
+      })).sort((a,b)=>b.tutar-a.tutar);
+      renderKpi(byPlate, etiket); renderList(byPlate);
     }catch(err){
       listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(err.message||err)+'</div>';
     }finally{
-      btn.disabled=false; btn.textContent='⛽ Çek';
+      btn.disabled=false;
     }
   });
 }
