@@ -31,6 +31,7 @@ function manSet(field,dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_manKe
 const normSube = (s) => String(s||'').trim().toLocaleLowerCase('tr-TR');
 let YAKIT_BY_STORE_MON = new Map();   // "normalize(mağaza)|YYYY-MM" -> tutar
 let YAKIT_BY_CH_MON = new Map();      // "normalize(pazaryeri)|YYYY-MM" -> tutar
+let MAAS_BY_STORE = new Map();        // "normalize(mağaza)" -> toplam maaş (her ay aynı, sabit gider)
 (async function loadYakitTotals(){
   const sb = window.__SB__; if(!sb) return;
   try{
@@ -46,6 +47,17 @@ let YAKIT_BY_CH_MON = new Map();      // "normalize(pazaryeri)|YYYY-MM" -> tutar
     render();
   }catch(e){ /* sessiz geç — Oto masrafı elle girilmiş haliyle kalır */ }
 })();
+(async function loadMaasTotals(){
+  const sb = window.__SB__; if(!sb) return;
+  try{
+    const { data, error } = await sb.from('araclar').select('sube,maas');
+    if(error || !data) return;
+    for(const a of data){
+      if(a.sube && a.maas!=null){ const k=normSube(a.sube); MAAS_BY_STORE.set(k,(MAAS_BY_STORE.get(k)||0)+ (+a.maas||0)); }
+    }
+    render();
+  }catch(e){ /* sessiz geç — Diğer gider elle girilmiş haliyle kalır */ }
+})();
 function otoAutoVal(dim,row,mon){
   if(dim==='store'){ const k=normSube(row)+'|'+mon; if(YAKIT_BY_STORE_MON.has(k)) return YAKIT_BY_STORE_MON.get(k); }
   if(dim==='ch'){ const k=normSube(row)+'|'+mon; if(YAKIT_BY_CH_MON.has(k)) return YAKIT_BY_CH_MON.get(k); }
@@ -54,7 +66,15 @@ function otoAutoVal(dim,row,mon){
 const otoGet=(dim,row,mon)=>{ const a=otoAutoVal(dim,row,mon); return a!=null ? a : manGet('oto',dim,row,mon); };
 const otoIsAuto=(dim,row,mon)=>otoAutoVal(dim,row,mon)!=null;
 const otoSet=(dim,row,mon,v)=>manSet('oto',dim,row,mon,v);
-const giderGet=(dim,row,mon)=>manGet('gider',dim,row,mon), giderSet=(dim,row,mon,v)=>manSet('gider',dim,row,mon,v);
+/* Diğer gider — mağazaya göre araclar.maas toplamından otomatik (her ay
+   aynı, sabit maaş gideri kabul edilir); pazaryeri tablosunda dokunulmaz. */
+function giderAutoVal(dim,row){
+  if(dim==='store'){ const k=normSube(row); if(MAAS_BY_STORE.has(k)) return MAAS_BY_STORE.get(k); }
+  return null;
+}
+const giderGet=(dim,row,mon)=>{ const a=giderAutoVal(dim,row); return a!=null ? a : manGet('gider',dim,row,mon); };
+const giderIsAuto=(dim,row,mon)=>giderAutoVal(dim,row)!=null;
+const giderSet=(dim,row,mon,v)=>manSet('gider',dim,row,mon,v);
 /* Enflasyonu Kâr/Zarar'a dahil et mi? [E]/[H] — global, tarayıcıda saklanır */
 const _enfKey='eta.final.enfDahil';
 function enfGet(){ try{ return localStorage.getItem(_enfKey)==='1'; }catch(e){ return false; } }
@@ -1014,9 +1034,11 @@ function finRows(O, dim, enfDahil){
   for(const r of m.values()) tot.set(r.rv,(tot.get(r.rv)||0)+r.ciro);
   const ord=[...tot.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
   return [...m.values()]
-    .map(r=>{ const oto=otoGet(dim,r.rv,r.mon), otoAuto=otoIsAuto(dim,r.rv,r.mon), other=giderGet(dim,r.rv,r.mon), gid=r.kom+oto+other, enf=TUFE[r.mon];
+    .map(r=>{ const oto=otoGet(dim,r.rv,r.mon), otoAuto=otoIsAuto(dim,r.rv,r.mon),
+        other=giderGet(dim,r.rv,r.mon), otherAuto=giderIsAuto(dim,r.rv,r.mon),
+        gid=r.kom+oto+other, enf=TUFE[r.mon];
       const enfAdj = (enfDahil && enf!=null) ? r.ciro*enf/100 : 0;
-      return {...r, oto, otoAuto, other, gid, enf, enfAdj, kz:r.ciro-r.smm-gid-enfAdj}; })
+      return {...r, oto, otoAuto, other, otherAuto, gid, enf, enfAdj, kz:r.ciro-r.smm-gid-enfAdj}; })
     .sort((a,b)=> ord.indexOf(a.rv)-ord.indexOf(b.rv) || (a.mon<b.mon?1:a.mon>b.mon?-1:0));
 }
 function finTable(O, dim, label, enfDahil, storeFilter){
@@ -1040,7 +1062,7 @@ function finTable(O, dim, label, enfDahil, storeFilter){
       `<td class="num">${esc(F.tl(r.smm))}</td>`+
       `<td class="num">${esc(F.tl(r.kom))}</td>`+
       `<td class="num"><input class="fin-oto" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.oto?esc(F.n(r.oto)):''}" placeholder="0"${r.otoAuto?' readonly title="Petrol Ofisi\'nden otomatik (yakitlar tablosu)"':''}></td>`+
-      `<td class="num"><input class="fin-oto fin-gider" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.other?esc(F.n(r.other)):''}" placeholder="0"></td>`+
+      `<td class="num"><input class="fin-oto fin-gider" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.other?esc(F.n(r.other)):''}" placeholder="0"${r.otherAuto?' readonly title="Araçlar > Maaş toplamından otomatik"':''}></td>`+
       `<td class="num">${esc(F.tl(r.gid))}</td>`+
       `<td class="num">${r.enf!=null?esc(F.n1(r.enf))+'%'+(r.enfAdj>0?' <span class="fin-enfon" title="Kâr/Zarardan düşüldü">↓</span>':''):'—'}</td>`+
       `<td class="num" style="${kzc(r.kz)};font-weight:700">${esc(F.tl(r.kz))}</td></tr>`;
@@ -1082,7 +1104,7 @@ RENDERERS.final=(v)=>{
   v.appendChild(tog);
   const nt=document.createElement('div'); nt.className='note';
   nt.innerHTML='<b>SMM</b> = ciro × (1 − dilim). Dilim: Ticimax %20 → ×0,80, Yemeksepeti %35 → ×0,65, Trendyol %35 → ×0,65. '+
-    '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b>: Petrol Ofisi verisi olan aylarda otomatik doldurulur ve salt-okunur olur (mağazada araç şubesine, pazaryerinde araç kaynağına [Araçlar > Kaynak] göre eşleştirilir); veri olmayan ay/satırlarda elle girip <b>Enter</b>. <b>Diğer gider</b> her zaman elle girilir, <b>Enter</b> ile kaydedilir — bu tarayıcıda saklanır. '+
+    '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b>: Petrol Ofisi verisi olan aylarda otomatik doldurulur ve salt-okunur olur (mağazada araç şubesine, pazaryerinde araç kaynağına [Araçlar > Kaynak] göre eşleştirilir); veri olmayan ay/satırlarda elle girip <b>Enter</b>. <b>Diğer gider</b>: mağaza tablosunda araçların [Araçlar > Maaş] toplamından otomatik doldurulur ve salt-okunur olur (her ay aynı, sabit gider); pazaryeri tablosunda ve maaş tanımlı olmayan mağazalarda elle girilir, <b>Enter</b> ile kaydedilir — bu tarayıcıda saklanır. '+
     '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı + Diğer gider)'+(enfDahil?' − (Ciro × Enf. %)':'')+'. '+
     '<b>Enf. %</b> aylık TÜİK TÜFE — [E]/[H] ile kâr/zarara dahil edilip edilmeyeceğini seçin (varsayılan: hayır, yalnız bilgi). '+
     '<span class="fin-open" style="margin-left:2px">ay kapanmadı</span> içinde bulunduğumuz ay için — rakamlar henüz kesinleşmedi.';
