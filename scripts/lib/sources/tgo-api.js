@@ -308,6 +308,60 @@ async function fetchCommissions({ from, to }) {
   return out;
 }
 
+/** orderNumber -> { ciro, kom, storeName, storeId, orderDate } — "Satış"
+    kalemlerini sipariş bazında toplar (credit->ciro, commissionAmount->kom).
+    Grocery sipariş API'si (fetchPackages) modifikasyon-tarihi penceresiyle
+    eski ayları güvenilir dönmüyor (birkaç boş pencerede erken duruyor) — bu
+    yüzden ESKİ sipariş BAŞLIKLARINI (ty4) doğrudan finans/settlements
+    API'sinden yeniden inşa etmek için kullanılır (bkz. backfill-tgo-orders-
+    from-finance.js). Aynı pencereleme/limit mantığı fetchCommissions ile. */
+async function fetchOrderFinance({ from, to }) {
+  const c = cfg();
+  if (!c.sellerId || !c.token || !(to > from)) return new Map();
+  const headers = { Authorization: `Basic ${c.token}`, Accept: 'application/json' };
+  const out = new Map();
+  const iso = (t) => new Date(t).toISOString().slice(0, 10);
+  let winEnd = to, guard = 0;
+
+  while (winEnd > from && guard < 500) {
+    const winStart = Math.max(winEnd - CHE_WIN, from);
+    let page = 0, totalPages = 1, winCount = 0;
+    while (page < totalPages && page < 200) {
+      const qs = new URLSearchParams({
+        startDate: String(winStart), endDate: String(winEnd),
+        transactionType: 'Sale', page: String(page), size: '1000'
+      });
+      let body;
+      try {
+        body = await jget(`${CHE_BASE}/sellers/${c.sellerId}/settlements?${qs}`, { headers });
+      } catch (e) {
+        log(id, `⚠ finans [${iso(winStart)}→${iso(winEnd)}] alınamadı: ${e.message}`);
+        break;
+      }
+      const list = Array.isArray(body && body.content) ? body.content : [];
+      totalPages = (body && body.totalPages) || 1;
+      for (const t of list) {
+        const no = String(t.orderNumber || '').trim();
+        if (!no) continue;
+        let r = out.get(no);
+        if (!r) { r = { ciro: 0, kom: 0, storeId: t.storeId || null, storeName: t.storeName || null, orderDate: t.orderDate || null }; out.set(no, r); }
+        r.ciro += Number(t.credit) || 0;
+        r.kom += Number(t.commissionAmount) || 0;
+        if (!r.orderDate && t.orderDate) r.orderDate = t.orderDate;
+        if (!r.storeName && t.storeName) r.storeName = t.storeName;
+      }
+      winCount += list.length;
+      if (!list.length) break;
+      page++;
+    }
+    guard++;
+    log(id, `finans penceresi [${iso(winStart)}→${iso(winEnd)}] — +${winCount} kayıt (${out.size} sipariş)`);
+    winEnd = winStart;
+    if (winStart <= from) break;
+  }
+  return out;
+}
+
 async function fetch(opts) {
   const pkgs = await fetchPackages(opts);
   const rows = toRows(pkgs);
@@ -336,4 +390,4 @@ async function fetch(opts) {
   return rows;
 }
 
-module.exports = { id, configured, fetch, fetchCommissions };
+module.exports = { id, configured, fetch, fetchCommissions, fetchOrderFinance };
