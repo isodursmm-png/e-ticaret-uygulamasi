@@ -20,6 +20,7 @@ const _otoKey = (dim,row,mon) => `eta.final.oto.${dim}.${row}.${mon}`;
 function otoGet(dim,row,mon){ try{ return +localStorage.getItem(_otoKey(dim,row,mon))||0; }catch(e){ return 0; } }
 function otoSet(dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_otoKey(dim,row,mon),String(val)) : localStorage.removeItem(_otoKey(dim,row,mon)); }catch(e){} }
 function parseTRNum(s){ s=String(s).replace(/[₺\s]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'); const n=parseFloat(s); return isFinite(n)?n:0; }
+const CURMON = (d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'))(new Date());   // "2026-09"
 const MONTHS_TR = {'01':'Oca','02':'Şub','03':'Mar','04':'Nis','05':'May','06':'Haz','07':'Tem','08':'Ağu','09':'Eyl','10':'Eki','11':'Kas','12':'Ara'};
 const WEEK = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
 const hourLbl = h => String(h).padStart(2,'0')+':00';   // 7 -> "07:00"
@@ -989,7 +990,7 @@ function finTable(O, dim, label){
     const first = r.rv!==prev; prev=r.rv;
     h+=`<tr${first?' class="fin-grp"':''}>`+
       `<td>${first?esc(r.rv):''}</td>`+
-      `<td class="num">${esc(F.mon(r.mon))}</td>`+
+      `<td class="num">${esc(F.mon(r.mon))}${r.mon===CURMON?' <span class="fin-open">ay kapanmadı</span>':''}</td>`+
       `<td class="num">${esc(F.tl(r.ciro))}</td>`+
       `<td class="num">${esc(F.tl(r.smm))}</td>`+
       `<td class="num">${esc(F.tl(r.kom))}</td>`+
@@ -1024,7 +1025,8 @@ RENDERERS.final=(v)=>{
   nt.innerHTML='<b>SMM</b> = ciro × (1 − dilim). Dilim: Ticimax %20 → ×0,80, Yemeksepeti %35 → ×0,65, Trendyol %35 → ×0,65. '+
     '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b> hücresine yazıp <b>Enter</b> — bu tarayıcıda saklanır. '+
     '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı). '+
-    '<b>Enf. %</b> TÜİK aylık TÜFE — bilgi amaçlı, kâr/zarara dahil değildir.';
+    '<b>Enf. %</b> TÜİK aylık TÜFE — bilgi amaçlı, kâr/zarara dahil değildir. '+
+    '<span class="fin-open" style="margin-left:2px">ay kapanmadı</span> içinde bulunduğumuz ay için — rakamlar henüz kesinleşmedi.';
   v.appendChild(nt);
   v.appendChild(panel('Pazaryerine göre — aylık kâr / zarar','Satır: pazaryeri × ay (en yeni ay üstte)', finTable(O,'ch','Pazaryeri')));
   v.appendChild(panel('Mağazaya göre — aylık kâr / zarar','Satır: mağaza × ay (en yeni ay üstte)', finTable(O,'store','Mağaza')));
