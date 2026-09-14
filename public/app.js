@@ -1152,7 +1152,7 @@ function renderAraclarPanel(v, sb){
     if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz araç kaydı yok</div>'; return; }
     let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
       `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th>Kaynak</th><th>Maaş</th><th></th></tr></thead><tbody>`;
-    rows.forEach(r=>{ h+= (r.id===editingId) ? editRow(r) : viewRow(r); });
+    rows.forEach(r=>{ h+= (String(r.id)===String(editingId)) ? editRow(r) : viewRow(r); });
     h+='</tbody></table></div>';
     listHost.innerHTML=h;
 
