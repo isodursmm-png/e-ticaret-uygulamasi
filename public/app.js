@@ -20,34 +20,35 @@ const TUFE = (window.__TUFE__ && window.__TUFE__.monthly) || {};
 const _manKey = (field,dim,row,mon) => `eta.final.${field}.${dim}.${row}.${mon}`;
 function manGet(field,dim,row,mon){ try{ return +localStorage.getItem(_manKey(field,dim,row,mon))||0; }catch(e){ return 0; } }
 function manSet(field,dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_manKey(field,dim,row,mon),String(val)) : localStorage.removeItem(_manKey(field,dim,row,mon)); }catch(e){} }
-/* Oto masrafı — public.yakitlar'dan otomatik (mağaza×ay: araclar.sube eşleşmesi;
-   pazaryeri×ay: yakıtın belirli bir pazaryeriyle ilişkisi olmadığından TÜM
-   araçların o ayki toplamı yalnızca "Ticimax" satırına yazılır). Senkron veri
-   olan hücreler salt-okunur olur; olmayan (ör. 2026 öncesi) hücrelerde elle
-   giriş eskisi gibi çalışmaya devam eder. */
-/* araclar.sube elle girildiği için büyük/küçük harf ve Türkçe karakter farkı
-   olabilir (ör. "ERCİYES" vs kanonik "Erciyes") — eşleştirmeyi harf
+/* Oto masrafı — public.yakitlar'dan otomatik: mağaza×ay araclar.sube eşleşmesiyle,
+   pazaryeri×ay araclar.source eşleşmesiyle (ör. source="ticimax" -> "Ticimax"
+   satırı) dolduruluyor. Senkron verisi olan hücreler salt-okunur olur; olmayan
+   (ör. source boş/tanınmayan, ya da 2026 öncesi) hücrelerde elle giriş eskisi
+   gibi çalışmaya devam eder. */
+/* araclar.sube/source elle girildiği için büyük/küçük harf ve Türkçe karakter
+   farkı olabilir (ör. "ERCİYES" vs kanonik "Erciyes") — eşleştirmeyi harf
    duyarsız (tr-TR) yapıyoruz, yoksa çoğu satır sessizce eşleşmez. */
 const normSube = (s) => String(s||'').trim().toLocaleLowerCase('tr-TR');
 let YAKIT_BY_STORE_MON = new Map();   // "normalize(mağaza)|YYYY-MM" -> tutar
-let YAKIT_BY_MON = new Map();         // "YYYY-MM" -> tutar (tüm araçlar toplamı)
+let YAKIT_BY_CH_MON = new Map();      // "normalize(pazaryeri)|YYYY-MM" -> tutar
 (async function loadYakitTotals(){
   const sb = window.__SB__; if(!sb) return;
   try{
-    const { data, error } = await sb.from('yakitlar').select('ay,tutar,araclar(sube)');
+    const { data, error } = await sb.from('yakitlar').select('ay,tutar,araclar(sube,source)');
     if(error || !data) return;
     for(const r of data){
       const mon=String(r.ay).slice(0,7), tutar=+r.tutar||0;
-      YAKIT_BY_MON.set(mon,(YAKIT_BY_MON.get(mon)||0)+tutar);
       const sube=r.araclar && r.araclar.sube;
       if(sube){ const k=normSube(sube)+'|'+mon; YAKIT_BY_STORE_MON.set(k,(YAKIT_BY_STORE_MON.get(k)||0)+tutar); }
+      const source=r.araclar && r.araclar.source;
+      if(source){ const k=normSube(source)+'|'+mon; YAKIT_BY_CH_MON.set(k,(YAKIT_BY_CH_MON.get(k)||0)+tutar); }
     }
     render();
   }catch(e){ /* sessiz geç — Oto masrafı elle girilmiş haliyle kalır */ }
 })();
 function otoAutoVal(dim,row,mon){
   if(dim==='store'){ const k=normSube(row)+'|'+mon; if(YAKIT_BY_STORE_MON.has(k)) return YAKIT_BY_STORE_MON.get(k); }
-  if(dim==='ch' && row==='Ticimax' && YAKIT_BY_MON.has(mon)) return YAKIT_BY_MON.get(mon);
+  if(dim==='ch'){ const k=normSube(row)+'|'+mon; if(YAKIT_BY_CH_MON.has(k)) return YAKIT_BY_CH_MON.get(k); }
   return null;
 }
 const otoGet=(dim,row,mon)=>{ const a=otoAutoVal(dim,row,mon); return a!=null ? a : manGet('oto',dim,row,mon); };
@@ -1081,7 +1082,7 @@ RENDERERS.final=(v)=>{
   v.appendChild(tog);
   const nt=document.createElement('div'); nt.className='note';
   nt.innerHTML='<b>SMM</b> = ciro × (1 − dilim). Dilim: Ticimax %20 → ×0,80, Yemeksepeti %35 → ×0,65, Trendyol %35 → ×0,65. '+
-    '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b>: Petrol Ofisi verisi olan aylarda otomatik doldurulur ve salt-okunur olur (mağazada şubeye göre; pazaryerinde tek satırda Ticimax’a yazılır); veri olmayan ay/satırlarda elle girip <b>Enter</b>. <b>Diğer gider</b> her zaman elle girilir, <b>Enter</b> ile kaydedilir — bu tarayıcıda saklanır. '+
+    '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b>: Petrol Ofisi verisi olan aylarda otomatik doldurulur ve salt-okunur olur (mağazada araç şubesine, pazaryerinde araç kaynağına [Araçlar > Kaynak] göre eşleştirilir); veri olmayan ay/satırlarda elle girip <b>Enter</b>. <b>Diğer gider</b> her zaman elle girilir, <b>Enter</b> ile kaydedilir — bu tarayıcıda saklanır. '+
     '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı + Diğer gider)'+(enfDahil?' − (Ciro × Enf. %)':'')+'. '+
     '<b>Enf. %</b> aylık TÜİK TÜFE — [E]/[H] ile kâr/zarara dahil edilip edilmeyeceğini seçin (varsayılan: hayır, yalnız bilgi). '+
     '<span class="fin-open" style="margin-left:2px">ay kapanmadı</span> içinde bulunduğumuz ay için — rakamlar henüz kesinleşmedi.';
@@ -1106,7 +1107,7 @@ RENDERERS.final=(v)=>{
 /* ============ E-TİCARET OTOLARI — araçlar + Petrol Ofisi yakıt alımları (canlı Supabase) ============ */
 /* ---- Araçlar: filo listesi (plaka/şube/şoför/kullanım) — public.araclar ---- */
 function renderAraclarPanel(v, sb){
-  const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, kullanım amacı');
+  const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, kullanım amacı, kaynak, maaş');
   panelEl.insertAdjacentHTML('beforeend', `
     <form id="aracForm" class="oto-form">
       <label>Plaka<input type="text" name="plaka" placeholder="07 AB 1234" required style="text-transform:uppercase"></label>
@@ -1114,27 +1115,68 @@ function renderAraclarPanel(v, sb){
       <datalist id="aracSubeList">${DIMS.store.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
       <label>Şoför<input type="text" name="sofor" placeholder="Ad Soyad"></label>
       <label>Kullanım<input type="text" name="kullanim" placeholder="Dağıtım / Servis / ..."></label>
+      <label>Kaynak<input type="text" name="source" placeholder="ticimax"></label>
+      <label>Maaş<input type="number" step="0.01" min="0" name="maas" placeholder="₺"></label>
       <button type="submit" class="tb-btn act">+ Ekle</button>
     </form>`);
   const listHost=document.createElement('div'); listHost.id='aracList'; listHost.textContent='Yükleniyor…';
   panelEl.appendChild(listHost);
   v.appendChild(panelEl);
 
+  let editingId=null;
+
+  function viewRow(r){
+    return `<tr data-id="${r.id}">`+
+      `<td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td><td>${esc(r.sofor||'')}</td>`+
+      `<td>${esc(r.kullanim||'')}</td><td>${esc(r.source||'')}</td>`+
+      `<td class="num">${r.maas!=null?esc(F.tl(r.maas)):'—'}</td>`+
+      `<td class="num">`+
+      `<button type="button" class="oto-edit tb-btn" data-id="${r.id}" title="Düzenle">✎</button> `+
+      `<button type="button" class="oto-del" data-id="${r.id}" title="Sil">✕</button>`+
+      `</td></tr>`;
+  }
+  function editRow(r){
+    return `<tr data-id="${r.id}" class="oto-editrow">`+
+      `<td><input type="text" class="ar-plaka" value="${esc(r.plaka||'')}" style="text-transform:uppercase"></td>`+
+      `<td><input type="text" class="ar-sube" list="aracSubeList" value="${esc(r.sube||'')}"></td>`+
+      `<td><input type="text" class="ar-sofor" value="${esc(r.sofor||'')}"></td>`+
+      `<td><input type="text" class="ar-kullanim" value="${esc(r.kullanim||'')}"></td>`+
+      `<td><input type="text" class="ar-source" value="${esc(r.source||'')}"></td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="ar-maas" value="${r.maas!=null?r.maas:''}"></td>`+
+      `<td class="num">`+
+      `<button type="button" class="oto-save tb-btn act" data-id="${r.id}" title="Kaydet">✓</button> `+
+      `<button type="button" class="oto-cancel tb-btn" data-id="${r.id}" title="Vazgeç">✕</button>`+
+      `</td></tr>`;
+  }
   function renderList(rows){
     if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz araç kaydı yok</div>'; return; }
     let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
-      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th></th></tr></thead><tbody>`;
-    rows.forEach(r=>{
-      h+=`<tr><td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td><td>${esc(r.sofor||'')}</td><td>${esc(r.kullanim||'')}</td>`+
-        `<td class="num"><button type="button" class="oto-del" data-id="${r.id}" title="Sil">✕</button></td></tr>`;
-    });
+      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th>Kaynak</th><th>Maaş</th><th></th></tr></thead><tbody>`;
+    rows.forEach(r=>{ h+= (r.id===editingId) ? editRow(r) : viewRow(r); });
     h+='</tbody></table></div>';
     listHost.innerHTML=h;
+
     listHost.querySelectorAll('.oto-del').forEach(b=> b.onclick=async()=>{
       if(!confirm('Bu aracı silmek istiyor musunuz?')) return;
       b.disabled=true;
       const { error }=await sb.from('araclar').delete().eq('id',b.dataset.id);
       if(error){ alert('Silinemedi: '+error.message); b.disabled=false; return; }
+      refresh();
+    });
+    listHost.querySelectorAll('.oto-edit').forEach(b=> b.onclick=()=>{ editingId=b.dataset.id; renderList(rows); });
+    listHost.querySelectorAll('.oto-cancel').forEach(b=> b.onclick=()=>{ editingId=null; renderList(rows); });
+    listHost.querySelectorAll('.oto-save').forEach(b=> b.onclick=async()=>{
+      const tr=b.closest('tr');
+      const val=cls=>{ const x=tr.querySelector('.'+cls).value.trim(); return x===''?null:x; };
+      const plaka=String(val('ar-plaka')||'').toUpperCase();
+      if(!plaka){ alert('Plaka gerekli.'); return; }
+      const maasRaw=tr.querySelector('.ar-maas').value;
+      const row={ plaka, sube:val('ar-sube'), sofor:val('ar-sofor'), kullanim:val('ar-kullanim'),
+        source:val('ar-source'), maas: maasRaw===''?null:Number(maasRaw) };
+      b.disabled=true;
+      const { error }=await sb.from('araclar').update(row).eq('id', b.dataset.id);
+      if(error){ alert('Kaydedilemedi: '+error.message); b.disabled=false; return; }
+      editingId=null;
       refresh();
     });
   }
@@ -1151,7 +1193,9 @@ function renderAraclarPanel(v, sb){
     const val=n=>{ const x=f.elements[n].value; return x===''?null:x; };
     const plaka=String(val('plaka')||'').trim().toUpperCase();
     if(!plaka){ alert('Plaka gerekli.'); return; }
-    const row={ plaka, sube:val('sube'), sofor:val('sofor'), kullanim:val('kullanim') };
+    const maasRaw=f.elements.maas.value;
+    const row={ plaka, sube:val('sube'), sofor:val('sofor'), kullanim:val('kullanim'),
+      source:val('source'), maas: maasRaw===''?null:Number(maasRaw) };
     const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
     const { error }=await sb.from('araclar').insert(row);
     btn.disabled=false;
