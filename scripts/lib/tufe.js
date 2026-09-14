@@ -1,16 +1,25 @@
 'use strict';
 /* ============================================================================
-   tufe.js — Aylık TÜİK TÜFE (Tüketici Fiyat Endeksi), bir önceki aya göre %.
-   Panodaki FİNAL segmenti "Enf. %" sütunu bunu kullanır.
+   tufe.js — Aylık TÜİK TÜFE, GIDA VE ALKOLSÜZ İÇECEKLER alt endeksi, bir
+   önceki aya göre %. Panodaki FİNAL segmenti "Enf. %" sütunu bunu kullanır.
 
-   Otomatik güncelleme: TCMB EVDS servisi (seri TP.FG.J0 = TÜFE Genel endeks),
-   aylara göre çekilip ay-üstü-ay yüzde değişim hesaplanır.
-     - ENV: EVDS_API_KEY  (ücretsiz: https://evds2.tcmb.tr → Profil → API Anahtarı)
-     - Anahtar yoksa yalnızca aşağıdaki gömülü tablo kullanılır.
-   Gömülü tablo (fallback) resmî TÜİK aylık oranlarıdır; EVDS'den gelen değer
-   varsa onun üzerine yazılır.
+   Otomatik güncelleme: TCMB EVDS servisi.
+     - ENV: EVDS_API_KEY        (ücretsiz: https://evds2.tcmb.gov.tr → Profil → API Anahtarı)
+     - ENV: EVDS_TUFE_SERIES    (ops.) gıda alt-endeks seri kodunu geçersiz kılar.
+       Varsayılan TP.FG.J1 — TÜFE "Genel" (TP.FG.J0) ile aynı aileden, COICOP
+       ana harcama gruplarının 1.si (Gıda ve alkolsüz içecekler). Bu kodu API
+       erişimi olmadan tam doğrulayamadık: sonuç mantıksız çıkarsa (çok az
+       nokta / aşırı uç değerler) otomatik olarak TÜFE Genel'e (TP.FG.J0)
+       düşülür — workflow log'unda hangi serinin kullanıldığı yazar, ilk
+       çalıştırmada TÜİK'in resmî gıda enflasyonu rakamlarıyla karşılaştırın.
+     - Anahtar yoksa (ya da her iki seri de başarısız olursa) yalnızca
+       aşağıdaki gömülü tablo kullanılır — bu tablo GENELdir, gıda değil.
    ========================================================================== */
 
+const FOOD_SERIES_DEFAULT = 'TP.FG.J1';   // Gıda ve alkolsüz içecekler (en iyi tahmin)
+const GENEL_SERIES = 'TP.FG.J0';          // TÜFE Genel — doğrulanmış, yedek
+
+/* Gömülü yedek — GENEL TÜFE (gıda değil). EVDS erişilemezse kullanılır. */
 const EMBED = {
   '2023-12': 2.93,
   '2024-01': 6.70, '2024-02': 4.53, '2024-03': 3.16, '2024-04': 3.18,
@@ -28,29 +37,24 @@ function ymKey(t) {
   return m ? `${m[1]}-${m[2].padStart(2, '0')}` : null;
 }
 
-async function fetchEvds() {
-  const key = (process.env.EVDS_API_KEY || '').trim();
-  if (!key) return {};
-
+/** Bir EVDS seri kodunun ay-üstü-ay % değişimini çeker. */
+async function fetchEvdsSeries(series, key) {
   const now = new Date();
   const end = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
-  const url = `https://evds2.tcmb.gov.tr/service/evds/series=TP.FG.J0&startDate=01-01-2023&endDate=${end}&type=json&frequency=5`;
+  const url = `https://evds2.tcmb.gov.tr/service/evds/series=${encodeURIComponent(series)}&startDate=01-01-2023&endDate=${end}&type=json&frequency=5`;
 
   const r = await fetch(url, { headers: { key, 'Accept': 'application/json' } });
-  if (!r.ok) throw new Error(`EVDS HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`EVDS HTTP ${r.status} (${series})`);
   const j = await r.json();
   const items = Array.isArray(j && j.items) ? j.items : [];
 
   // endeks değerlerini ay sırasına diz
+  const fieldRe = new RegExp('^' + series.replace(/\./g, '_') + '$', 'i');
   const idx = [];
   for (const row of items) {
     const ym = ymKey(row.Tarih || row.tarih);
-    // alan adı genelde TP_FG_J0; sürüme göre değişebilir → TP_FG_J0 ile başlayan ilk sayısal alan
-    let val = row.TP_FG_J0;
-    if (val == null) {
-      const k = Object.keys(row).find(k => /^TP_FG_J0/i.test(k));
-      if (k) val = row[k];
-    }
+    let val = Object.keys(row).find((k) => fieldRe.test(k));
+    val = val != null ? row[val] : undefined;
     const num = parseFloat(val);
     if (ym && isFinite(num)) idx.push([ym, num]);
   }
@@ -64,15 +68,44 @@ async function fetchEvds() {
   return out;
 }
 
-/** { 'YYYY-MM': aylıkYüzde, ... } — gömülü tablo + (varsa) EVDS. */
-async function monthlyTufe() {
-  let evds = {};
-  try {
-    evds = await fetchEvds();
-  } catch (e) {
-    console.warn('  TÜFE/EVDS atlandı:', e.message);
-  }
-  return { ...EMBED, ...evds };
+/** Sonuç mantıklı mı? (yeterli ay + makul aralık) — yanlış/boş seri kodunu ele. */
+function isSane(monthly) {
+  const vals = Object.values(monthly);
+  if (vals.length < 6) return false;
+  return vals.every((v) => v > -20 && v < 50);
 }
 
-module.exports = { monthlyTufe, EMBED };
+/** { monthly:{ 'YYYY-MM': aylıkYüzde }, series, food } */
+async function monthlyTufe() {
+  const key = (process.env.EVDS_API_KEY || '').trim();
+  if (!key) {
+    console.warn('  TÜFE: EVDS_API_KEY yok — gömülü GENEL TÜFE (gıda değil) kullanılıyor.');
+    return { monthly: EMBED, series: 'embed', food: false };
+  }
+
+  const foodSeries = (process.env.EVDS_TUFE_SERIES || FOOD_SERIES_DEFAULT).trim();
+  try {
+    const food = await fetchEvdsSeries(foodSeries, key);
+    if (isSane(food)) {
+      console.log(`  TÜFE: ${foodSeries} (gıda) — ${Object.keys(food).length} ay`);
+      return { monthly: food, series: foodSeries, food: true };
+    }
+    console.warn(`  TÜFE: ${foodSeries} verisi güvenilir görünmüyor (az/uç değer) — TÜFE Genel'e düşülüyor.`);
+  } catch (e) {
+    console.warn(`  TÜFE: ${foodSeries} alınamadı (${e.message}) — TÜFE Genel'e düşülüyor.`);
+  }
+
+  try {
+    const genel = await fetchEvdsSeries(GENEL_SERIES, key);
+    if (isSane(genel)) {
+      console.log(`  TÜFE: ${GENEL_SERIES} (genel, yedek) — ${Object.keys(genel).length} ay`);
+      return { monthly: { ...EMBED, ...genel }, series: GENEL_SERIES, food: false };
+    }
+  } catch (e) {
+    console.warn('  TÜFE: genel seri de alınamadı:', e.message);
+  }
+
+  return { monthly: EMBED, series: 'embed', food: false };
+}
+
+module.exports = { monthlyTufe, EMBED, FOOD_SERIES_DEFAULT, GENEL_SERIES };

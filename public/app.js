@@ -19,6 +19,12 @@ const TUFE = (window.__TUFE__ && window.__TUFE__.monthly) || {};
 const _otoKey = (dim,row,mon) => `eta.final.oto.${dim}.${row}.${mon}`;
 function otoGet(dim,row,mon){ try{ return +localStorage.getItem(_otoKey(dim,row,mon))||0; }catch(e){ return 0; } }
 function otoSet(dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_otoKey(dim,row,mon),String(val)) : localStorage.removeItem(_otoKey(dim,row,mon)); }catch(e){} }
+/* Enflasyonu Kâr/Zarar'a dahil et mi? [E]/[H] — global, tarayıcıda saklanır */
+const _enfKey='eta.final.enfDahil';
+function enfGet(){ try{ return localStorage.getItem(_enfKey)==='1'; }catch(e){ return false; } }
+function enfSet(v){ try{ localStorage.setItem(_enfKey, v?'1':'0'); }catch(e){} }
+const TUFE_FOOD = !!(window.__TUFE__ && window.__TUFE__.food);
+const TUFE_SERIES = (window.__TUFE__ && window.__TUFE__.series) || 'embed';
 function parseTRNum(s){ s=String(s).replace(/[₺\s]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'); const n=parseFloat(s); return isFinite(n)?n:0; }
 const CURMON = (d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'))(new Date());   // "2026-09"
 const MONTHS_TR = {'01':'Oca','02':'Şub','03':'Mar','04':'Nis','05':'May','06':'Haz','07':'Tem','08':'Ağu','09':'Eyl','10':'Eki','11':'Kas','12':'Ara'};
@@ -956,7 +962,7 @@ RENDERERS.genel=(v)=>{
 };
 
 /* ============ FİNAL — Kâr / Zarar ============ */
-function finRows(O, dim){
+function finRows(O, dim, enfDahil){
   const D=O.filter(deliv);
   const m=new Map();
   for(const o of D){
@@ -971,12 +977,13 @@ function finRows(O, dim){
   for(const r of m.values()) tot.set(r.rv,(tot.get(r.rv)||0)+r.ciro);
   const ord=[...tot.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
   return [...m.values()]
-    .map(r=>{ const oto=otoGet(dim,r.rv,r.mon), gid=r.kom+oto;
-      return {...r, oto, gid, kz:r.ciro-r.smm-gid, enf:TUFE[r.mon]}; })
+    .map(r=>{ const oto=otoGet(dim,r.rv,r.mon), gid=r.kom+oto, enf=TUFE[r.mon];
+      const enfAdj = (enfDahil && enf!=null) ? r.ciro*enf/100 : 0;
+      return {...r, oto, gid, enf, enfAdj, kz:r.ciro-r.smm-gid-enfAdj}; })
     .sort((a,b)=> ord.indexOf(a.rv)-ord.indexOf(b.rv) || (a.mon<b.mon?1:a.mon>b.mon?-1:0));
 }
-function finTable(O, dim, label){
-  const rows=finRows(O,dim);
+function finTable(O, dim, label, enfDahil){
+  const rows=finRows(O,dim,enfDahil);
   const w=document.createElement('div');
   if(!rows.length){ w.className='miss'; w.textContent='Veri yok'; return w; }
   const T=rows.reduce((a,r)=>{ a.ciro+=r.ciro;a.smm+=r.smm;a.kom+=r.kom;a.oto+=r.oto;a.gid+=r.gid;a.kz+=r.kz; return a; },
@@ -996,7 +1003,7 @@ function finTable(O, dim, label){
       `<td class="num">${esc(F.tl(r.kom))}</td>`+
       `<td class="num"><input class="fin-oto" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.oto?esc(F.n(r.oto)):''}" placeholder="0"></td>`+
       `<td class="num">${esc(F.tl(r.gid))}</td>`+
-      `<td class="num">${r.enf!=null?esc(F.n1(r.enf))+'%':'—'}</td>`+
+      `<td class="num">${r.enf!=null?esc(F.n1(r.enf))+'%'+(r.enfAdj>0?' <span class="fin-enfon" title="Kâr/Zarardan düşüldü">↓</span>':''):'—'}</td>`+
       `<td class="num" style="${kzc(r.kz)};font-weight:700">${esc(F.tl(r.kz))}</td></tr>`;
   });
   h+=`</tbody><tfoot><tr><td>Toplam</td><td></td>`+
@@ -1013,7 +1020,8 @@ function finTable(O, dim, label){
 }
 RENDERERS.final=(v)=>{
   const O=fO();
-  const R=finRows(O,'ch');
+  const enfDahil=enfGet();
+  const R=finRows(O,'ch',enfDahil);
   const T=R.reduce((a,r)=>{ a.ciro+=r.ciro;a.smm+=r.smm;a.gid+=r.gid;a.kz+=r.kz; return a; },{ciro:0,smm:0,gid:0,kz:0});
   v.appendChild(kpirow(
     kpi('Ciro (teslim edilen)',F.tl(T.ciro),F.mon(PL.meta.minDate)+' →')+
@@ -1021,15 +1029,22 @@ RENDERERS.final=(v)=>{
     kpi('Giderler',F.tl(T.gid),'komisyon + oto masrafı')+
     kpi('Kâr / Zarar',F.tl(T.kz), T.kz>=0?'kâr':'zarar', T.kz>=0?'up':'down')
   ));
+  const tog=document.createElement('div'); tog.className='fin-enftog';
+  tog.innerHTML=`<span class="lbl">Enflasyon Kâr/Zarar'a dahil olsun mu?</span>`+
+    `<button type="button" class="fin-tb fin-tb-e${enfDahil?' on':''}" data-v="1">E</button>`+
+    `<button type="button" class="fin-tb fin-tb-h${enfDahil?'':' on'}" data-v="0">H</button>`+
+    `<span class="fin-src">Enf. % kaynağı: TÜİK TÜFE — ${TUFE_FOOD?'gıda sektörü ('+esc(TUFE_SERIES)+')':'genel (gıda verisi henüz yok)'}</span>`;
+  tog.querySelectorAll('.fin-tb').forEach(b=> b.onclick=()=>{ enfSet(b.dataset.v==='1'); render(); });
+  v.appendChild(tog);
   const nt=document.createElement('div'); nt.className='note';
   nt.innerHTML='<b>SMM</b> = ciro × (1 − dilim). Dilim: Ticimax %20 → ×0,80, Yemeksepeti %35 → ×0,65, Trendyol %35 → ×0,65. '+
     '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b> hücresine yazıp <b>Enter</b> — bu tarayıcıda saklanır. '+
-    '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı). '+
-    '<b>Enf. %</b> TÜİK aylık TÜFE — bilgi amaçlı, kâr/zarara dahil değildir. '+
+    '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı)'+(enfDahil?' − (Ciro × Enf. %)':'')+'. '+
+    '<b>Enf. %</b> aylık TÜİK TÜFE — [E]/[H] ile kâr/zarara dahil edilip edilmeyeceğini seçin (varsayılan: hayır, yalnız bilgi). '+
     '<span class="fin-open" style="margin-left:2px">ay kapanmadı</span> içinde bulunduğumuz ay için — rakamlar henüz kesinleşmedi.';
   v.appendChild(nt);
-  v.appendChild(panel('Pazaryerine göre — aylık kâr / zarar','Satır: pazaryeri × ay (en yeni ay üstte)', finTable(O,'ch','Pazaryeri')));
-  v.appendChild(panel('Mağazaya göre — aylık kâr / zarar','Satır: mağaza × ay (en yeni ay üstte)', finTable(O,'store','Mağaza')));
+  v.appendChild(panel('Pazaryerine göre — aylık kâr / zarar','Satır: pazaryeri × ay (en yeni ay üstte)', finTable(O,'ch','Pazaryeri',enfDahil)));
+  v.appendChild(panel('Mağazaya göre — aylık kâr / zarar','Satır: mağaza × ay (en yeni ay üstte)', finTable(O,'store','Mağaza',enfDahil)));
 };
 
 RENDERERS.ciro=(v)=>{

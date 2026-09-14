@@ -38,8 +38,9 @@ jobs:
           SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
           FETCH_DAYS: ${{ vars.FETCH_DAYS || '0' }}
           STORE_NAMES: ${{ vars.STORE_NAMES }}
-          # FİNAL segmenti "Enf. %" — TCMB EVDS'ten aylık TÜFE (opsiyonel; yoksa gömülü tablo)
+          # FİNAL segmenti "Enf. %" — TCMB EVDS'ten aylık TÜFE, gıda sektörü (opsiyonel; yoksa gömülü genel tablo)
           EVDS_API_KEY: ${{ secrets.EVDS_API_KEY }}
+          EVDS_TUFE_SERIES: ${{ vars.EVDS_TUFE_SERIES }}
 
           TICIMAX_API_URL: ${{ vars.TICIMAX_API_URL }}
           TICIMAX_CODE: ${{ secrets.TICIMAX_CODE }}
