@@ -63,8 +63,28 @@ function toRawRows(merged = {}) {
   return [...byKey.values()];
 }
 
+/** Trendyol Sipariş API'si komisyonu sipariş bazında vermez (ty4.Komisyon=0
+    gelir) — bu yüzden panelden elle yüklenen "Komisyon Listesi" xlsx'iyle
+    (import-xlsx-raw.js) doldurulmuş gerçek komisyonu korur: gelen satır 0/boş
+    ve DB'de zaten >0 bir değer kayıtlıysa, üzerine yazmak yerine onu tutar.
+    Aksi halde her saatlik canlı senkron, elle girilen komisyonu sıfırlardı. */
+async function preserveKnownCommission(sb, rows) {
+  const cand = rows.filter((r) => r.bucket === 'ty4' && !(Number(r.data && r.data['Komisyon']) > 0));
+  if (!cand.length) return;
+  for (let i = 0; i < cand.length; i += 200) {
+    const slice = cand.slice(i, i + 200);
+    const { data: ex } = await sb.from('raw_orders').select('key, data').in('key', slice.map((r) => r.key));
+    const byKey = new Map((ex || []).map((r) => [r.key, r.data]));
+    for (const r of slice) {
+      const oldKom = Number((byKey.get(r.key) || {})['Komisyon']);
+      if (oldKom > 0) r.data['Komisyon'] = oldKom;
+    }
+  }
+}
+
 /** raw_orders'a parça parça upsert (onConflict: key). first_seen'e dokunmaz. */
 async function pushRaw(sb, rows, { chunk = 500 } = {}) {
+  await preserveKnownCommission(sb, rows);
   let n = 0;
   for (let i = 0; i < rows.length; i += chunk) {
     const part = rows.slice(i, i + chunk);
