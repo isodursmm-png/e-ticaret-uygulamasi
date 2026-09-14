@@ -83,7 +83,13 @@ async function main() {
       const cur = Number(row.data['Komisyon']) || 0;
       const real = Math.round(v * 100) / 100;
       if (Math.abs(cur - real) < 0.01) continue;   // zaten doğru
-      pending.push({ key: row.key, data: { ...row.data, Komisyon: real }, updated_at: new Date().toISOString() });
+      // NOT: upsert(onConflict) bir INSERT olarak derlenir — source/bucket/level
+      // NOT NULL olduğundan, satır zaten var olsa da payload'da bulunmalı.
+      // Bu betikteki tüm key'ler "trendyol:ty4:*" olduğundan sabit veriyoruz.
+      pending.push({
+        key: row.key, source: 'trendyol', bucket: 'ty4', level: 'order',
+        data: { ...row.data, Komisyon: real }, updated_at: new Date().toISOString()
+      });
     }
     if (pending.length >= 300) await flush();
     process.stdout.write(`  denenen sipariş no ${scanned}/${orderNos.length} · bulunan+eşleşen ${matched} · güncellenecek ${changed + pending.length}\r`);
