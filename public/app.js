@@ -1071,8 +1071,7 @@ RENDERERS.final=(v)=>{
   v.appendChild(magPanel);
 };
 
-/* ============ E-TİCARET OTOLARI — filo/yakıt masraf kaydı (canlı Supabase) ============ */
-const otoFmtDate = s => { if(!s) return '—'; const p=String(s).slice(0,10).split('-'); return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:s; };
+/* ============ E-TİCARET OTOLARI — araçlar + Petrol Ofisi yakıt alımları (canlı Supabase) ============ */
 /* ---- Araçlar: filo listesi (plaka/şube/şoför/kullanım) — public.araclar ---- */
 function renderAraclarPanel(v, sb){
   const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, kullanım amacı');
@@ -1174,14 +1173,24 @@ function renderYakitPanel(v, sb){
     const f=e.target;
     const start=f.elements.start.value, end=f.elements.end.value;
     const btn=f.querySelector('button[type=submit]');
-    btn.disabled=true; btn.textContent='⏳ Çekiliyor… (Render uykudaysa 1-2 dk sürebilir)';
     kpiRow.innerHTML=''; listHost.innerHTML='';
+    const MAX_TRY=3;
     try{
       const { data:{ session } }=await sb.auth.getSession();
       if(!session) throw new Error('Oturum bulunamadı, tekrar giriş yapın.');
-      const r=await fetch(`/api/yakit?start=${start}&end=${end}`, { headers:{ Authorization:'Bearer '+session.access_token } });
-      const j=await r.json().catch(()=>({}));
-      if(!r.ok || j.ok===false) throw new Error(j.error||('HTTP '+r.status));
+
+      let j=null, lastErr=null;
+      for(let attempt=1; attempt<=MAX_TRY; attempt++){
+        btn.disabled=true;
+        btn.textContent=attempt===1 ? '⏳ Çekiliyor… (Render uykudaysa yavaş olabilir)' : `⏳ Tekrar deneniyor… (${attempt}/${MAX_TRY})`;
+        const r=await fetch(`/api/yakit?start=${start}&end=${end}`, { headers:{ Authorization:'Bearer '+session.access_token } });
+        const body=await r.json().catch(()=>({}));
+        if(r.ok && body.ok!==false){ j=body; break; }
+        lastErr=new Error(body.error||('HTTP '+r.status));
+        const retryable=body.retry===true || r.status===504;
+        if(!retryable || attempt===MAX_TRY) throw lastErr;
+        await new Promise(res=>setTimeout(res,4000));
+      }
       renderKpi(j.byPlate||[]); renderList(j.byPlate||[]);
     }catch(err){
       listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(err.message||err)+'</div>';
@@ -1194,92 +1203,9 @@ function renderYakitPanel(v, sb){
 RENDERERS.otolar=(v)=>{
   const sb=window.__SB__;
   if(!sb){ const m=document.createElement('div'); m.className='miss'; m.textContent='Supabase bağlantısı yok.'; v.appendChild(m); return; }
-  const today=new Date().toISOString().slice(0,10);
 
-  renderAraclarPanel(v, sb);
   renderYakitPanel(v, sb);
-
-  const kpiRow=document.createElement('div'); kpiRow.className='kpirow'; kpiRow.id='otoKpi';
-  kpiRow.innerHTML=kpi('Kayıt sayısı','…')+kpi('Toplam ücret maliyeti','…')+kpi('Toplam yakıt','…')+kpi("Toplam KDV'li tutar",'…');
-  v.appendChild(kpiRow);
-
-  const formPanel=panel('Yeni kayıt','Plaka, lokasyon, kullanıcı, ücret maliyeti, yakıt (L), KDV\'li tutar');
-  formPanel.insertAdjacentHTML('beforeend', `
-    <form id="otoForm" class="oto-form">
-      <label>Tarih<input type="date" name="tarih" value="${today}" required></label>
-      <label>Plaka<input type="text" name="plaka" placeholder="07 AB 1234" required style="text-transform:uppercase"></label>
-      <label>Lokasyon<input type="text" name="lokasyon" list="otoLokList" placeholder="Erciyes" autocomplete="off"></label>
-      <datalist id="otoLokList">${DIMS.store.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
-      <label>Kullanıcı<input type="text" name="kullanici" placeholder="Ad Soyad"></label>
-      <label>Ücret maliyeti<input type="number" step="0.01" min="0" name="ucret_maliyeti" placeholder="₺"></label>
-      <label>Yakıt (L)<input type="number" step="0.01" min="0" name="yakit_litre" placeholder="L"></label>
-      <label>KDV'li tutar<input type="number" step="0.01" min="0" name="kdvli_tutar" placeholder="₺"></label>
-      <button type="submit" class="tb-btn act">+ Ekle</button>
-    </form>`);
-  v.appendChild(formPanel);
-
-  const listPanel=panel('Kayıtlar','En yeni üstte');
-  const listHost=document.createElement('div'); listHost.id='otoList'; listHost.textContent='Yükleniyor…';
-  listPanel.appendChild(listHost);
-  v.appendChild(listPanel);
-
-  function renderKpi(rows){
-    const sum=k=>rows.reduce((a,r)=>a+(+r[k]||0),0);
-    kpiRow.innerHTML=kpi('Kayıt sayısı',F.n(rows.length))+kpi('Toplam ücret maliyeti',F.tl(sum('ucret_maliyeti')))+
-      kpi('Toplam yakıt',F.n1(sum('yakit_litre'))+' L')+kpi("Toplam KDV'li tutar",F.tl(sum('kdvli_tutar')));
-  }
-  function renderList(rows){
-    if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz kayıt yok</div>'; return; }
-    let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
-      `<th>Tarih</th><th>Plaka</th><th>Lokasyon</th><th>Kullanıcı</th>`+
-      `<th>Ücret maliyeti</th><th>Yakıt (L)</th><th>KDV'li tutar</th><th></th></tr></thead><tbody>`;
-    rows.forEach(r=>{
-      h+=`<tr><td class="num">${esc(otoFmtDate(r.tarih))}</td><td>${esc(r.plaka||'')}</td><td>${esc(r.lokasyon||'')}</td>`+
-        `<td>${esc(r.kullanici||'')}</td><td class="num">${r.ucret_maliyeti!=null?esc(F.tl(r.ucret_maliyeti)):'—'}</td>`+
-        `<td class="num">${r.yakit_litre!=null?esc(F.n1(r.yakit_litre)):'—'}</td>`+
-        `<td class="num">${r.kdvli_tutar!=null?esc(F.tl(r.kdvli_tutar)):'—'}</td>`+
-        `<td class="num"><button type="button" class="oto-del" data-id="${r.id}" title="Sil">✕</button></td></tr>`;
-    });
-    h+='</tbody></table></div>';
-    listHost.innerHTML=h;
-    listHost.querySelectorAll('.oto-del').forEach(b=> b.onclick=async()=>{
-      if(!confirm('Bu kaydı silmek istiyor musunuz?')) return;
-      b.disabled=true;
-      const { error }=await sb.from('vehicle_logs').delete().eq('id',b.dataset.id);
-      if(error){ alert('Silinemedi: '+error.message); b.disabled=false; return; }
-      refresh();
-    });
-  }
-  async function refresh(){
-    listHost.textContent='Yükleniyor…';
-    const { data, error }=await sb.from('vehicle_logs').select('*').order('tarih',{ascending:false}).order('id',{ascending:false}).limit(1000);
-    if(error){ listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(error.message)+'</div>'; return; }
-    renderKpi(data||[]); renderList(data||[]);
-  }
-  formPanel.querySelector('#otoForm').addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const f=e.target;
-    const val=n=>{ const x=f.elements[n].value; return x===''?null:x; };
-    const num=n=>{ const x=f.elements[n].value; return x===''?null:Number(x); };
-    const plaka=String(val('plaka')||'').trim().toUpperCase();
-    if(!plaka){ alert('Plaka gerekli.'); return; }
-    // lokasyonu bilinen mağaza listesiyle eşleştir (yazım farkı olsa da tek adla özdeşleşsin)
-    let lokasyon=String(val('lokasyon')||'').trim();
-    if(lokasyon){
-      const lc=lokasyon.toLowerCase();
-      const hit=DIMS.store.find(s=>s.toLowerCase()===lc) || DIMS.store.find(s=>lc.includes(s.toLowerCase()));
-      if(hit) lokasyon=hit;
-    }
-    const row={ tarih:val('tarih')||today, plaka, lokasyon:lokasyon||null, kullanici:val('kullanici'),
-      ucret_maliyeti:num('ucret_maliyeti'), yakit_litre:num('yakit_litre'), kdvli_tutar:num('kdvli_tutar') };
-    const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
-    const { error }=await sb.from('vehicle_logs').insert(row);
-    btn.disabled=false;
-    if(error){ alert('Eklenemedi: '+error.message); return; }
-    f.reset(); f.elements['tarih'].value=today;
-    refresh();
-  });
-  refresh();
+  renderAraclarPanel(v, sb);
 };
 
 RENDERERS.ciro=(v)=>{

@@ -37,6 +37,9 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
           FETCH_DAYS: ${{ vars.FETCH_DAYS || '0' }}
+          # Pano (analytics_payload) kaç günlük geçmişten kurulsun (raw_orders'taki
+          # tüm geçmiş etkilenmez). Varsayılan 365 — açılış süresini kısa tutar.
+          PAYLOAD_DAYS: ${{ vars.PAYLOAD_DAYS }}
           STORE_NAMES: ${{ vars.STORE_NAMES }}
           # FİNAL segmenti "Enf. %" — TCMB EVDS'ten aylık TÜFE, gıda sektörü (opsiyonel; yoksa gömülü genel tablo)
           EVDS_API_KEY: ${{ secrets.EVDS_API_KEY }}

@@ -166,11 +166,18 @@ async function buildAndPush({ only = null, days, headed = false, dryRun = false,
     }
   }
 
-  // 2) Panoyu ham arşivin TAMAMINDAN kur (tüm geçmiş) — parçalı yaz.
+  // 2) Panoyu ham arşivden kur — varsayılan son PAYLOAD_DAYS gün (365 = ~12 ay).
+  //    Tüm geçmiş büyüdükçe payload (gzip'li, tarayıcıda açılan) da büyüyüp
+  //    açılış süresini uzatıyordu; pano varsayılanı son 12 aya sabitlendi.
+  //    Eski veri raw_orders'ta durmaya devam eder, yalnızca varsayılan pano
+  //    görünümünden çıkar. PAYLOAD_DAYS=0 tüm geçmişe döner.
+  const PAYLOAD_DAYS = Number(process.env.PAYLOAD_DAYS || 365);
+  const payloadSinceISO = PAYLOAD_DAYS > 0 ? new Date(Date.now() - PAYLOAD_DAYS * 86400e3).toISOString() : null;
+
   let pub;
   try {
     pub = await withRetry('analytics_payload publish', () =>
-      publishFromRaw(sb, { geo: loadGeo(), fallbackP: P, log: (m) => console.log('  ' + m) }));
+      publishFromRaw(sb, { geo: loadGeo(), sinceISO: payloadSinceISO, fallbackP: P, log: (m) => console.log('  ' + m) }));
     console.log(`\n✓ analytics_payload — ${pub.meta.orders} sipariş · ${pub.meta.minDate} – ${pub.meta.maxDate} · ${pub.chunks} parça${pub.fallback ? ' (fallback: canlı)' : ''}`);
   } catch (e) {
     console.warn(`⚠ tüm-geçmiş kurulum başarısız (${e.message}) — canlı payload tek satır yazılıyor`);

@@ -102,10 +102,32 @@ module.exports = async (req, res) => {
     const proxyToken = await getAracTakipToken();
 
     // ---- 5) yakıt verisini çek ----
+    // Render uykudan uyanıyorsa veya Petrol Ofisi yavaşsa bu çağrı uzun sürebilir.
+    // Vercel'in kendi süre sınırı (maxDuration) fonksiyonu sert şekilde kesip düz bir
+    // 504 döndürür (JSON değil) — bunun yerine kendi süremizi biraz daha kısa tutup
+    // temiz, "tekrar dene" işaretli bir JSON hatası döndürüyoruz. arac_takip_sistemi
+    // tarafında 5 dk'lık bir yanıt önbelleği olduğundan (fuel.ts), aynı tarih aralığı
+    // için hemen sonra yapılan tekrar deneme genelde çok daha hızlı döner.
     const qs = `start=${start.toISOString().slice(0, 10)}&end=${end.toISOString().slice(0, 10)}`;
-    const fr = await fetch(`${base}/api/yakitlar?${qs}`, {
-      headers: { Authorization: `Bearer ${proxyToken}` }
-    });
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 55000);
+    let fr;
+    try {
+      fr = await fetch(`${base}/api/yakitlar?${qs}`, {
+        headers: { Authorization: `Bearer ${proxyToken}` },
+        signal: ctrl.signal
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        return res.status(504).json({
+          ok: false, retry: true,
+          error: 'arac_takip_sistemi yanıt vermedi (Render uyanıyor veya Petrol Ofisi yavaş olabilir) — birkaç saniye sonra tekrar deneyin.'
+        });
+      }
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
     if (!fr.ok) {
       const t = await fr.text().catch(() => '');
       return res.status(502).json({ ok: false, error: `arac_takip_sistemi ${fr.status}: ${t.slice(0, 300)}` });
@@ -150,4 +172,4 @@ module.exports = async (req, res) => {
   }
 };
 
-module.exports.config = { maxDuration: 90 };
+module.exports.config = { maxDuration: 60 };

@@ -7,6 +7,6 @@
   "trailingSlash": false,
   "functions": {
     "api/refresh.js": { "maxDuration": 30 },
-    "api/yakit.js": { "maxDuration": 90 }
+    "api/yakit.js": { "maxDuration": 60 }
   }
 }
