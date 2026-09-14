@@ -25,7 +25,11 @@ function manSet(field,dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_manKe
    araçların o ayki toplamı yalnızca "Ticimax" satırına yazılır). Senkron veri
    olan hücreler salt-okunur olur; olmayan (ör. 2026 öncesi) hücrelerde elle
    giriş eskisi gibi çalışmaya devam eder. */
-let YAKIT_BY_STORE_MON = new Map();   // "mağaza|YYYY-MM" -> tutar
+/* araclar.sube elle girildiği için büyük/küçük harf ve Türkçe karakter farkı
+   olabilir (ör. "ERCİYES" vs kanonik "Erciyes") — eşleştirmeyi harf
+   duyarsız (tr-TR) yapıyoruz, yoksa çoğu satır sessizce eşleşmez. */
+const normSube = (s) => String(s||'').trim().toLocaleLowerCase('tr-TR');
+let YAKIT_BY_STORE_MON = new Map();   // "normalize(mağaza)|YYYY-MM" -> tutar
 let YAKIT_BY_MON = new Map();         // "YYYY-MM" -> tutar (tüm araçlar toplamı)
 (async function loadYakitTotals(){
   const sb = window.__SB__; if(!sb) return;
@@ -36,13 +40,13 @@ let YAKIT_BY_MON = new Map();         // "YYYY-MM" -> tutar (tüm araçlar topla
       const mon=String(r.ay).slice(0,7), tutar=+r.tutar||0;
       YAKIT_BY_MON.set(mon,(YAKIT_BY_MON.get(mon)||0)+tutar);
       const sube=r.araclar && r.araclar.sube;
-      if(sube){ const k=sube+'|'+mon; YAKIT_BY_STORE_MON.set(k,(YAKIT_BY_STORE_MON.get(k)||0)+tutar); }
+      if(sube){ const k=normSube(sube)+'|'+mon; YAKIT_BY_STORE_MON.set(k,(YAKIT_BY_STORE_MON.get(k)||0)+tutar); }
     }
     render();
   }catch(e){ /* sessiz geç — Oto masrafı elle girilmiş haliyle kalır */ }
 })();
 function otoAutoVal(dim,row,mon){
-  if(dim==='store'){ const k=row+'|'+mon; if(YAKIT_BY_STORE_MON.has(k)) return YAKIT_BY_STORE_MON.get(k); }
+  if(dim==='store'){ const k=normSube(row)+'|'+mon; if(YAKIT_BY_STORE_MON.has(k)) return YAKIT_BY_STORE_MON.get(k); }
   if(dim==='ch' && row==='Ticimax' && YAKIT_BY_MON.has(mon)) return YAKIT_BY_MON.get(mon);
   return null;
 }

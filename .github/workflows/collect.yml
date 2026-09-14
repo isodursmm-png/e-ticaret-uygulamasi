@@ -3,7 +3,9 @@ name: collect
 # Canlı veri motoru: kaynaklardan çek -> buildPayload -> Supabase.
 on:
   schedule:
-    - cron: '0 * * * *'          # her saat başı (otonom)
+    - cron: '0 */3 * * *'        # her 3 saatte bir (otonom) — private repo'nun ücretsiz
+                                  # Actions dakika kotasında rahat kalması için hourly'den düşürüldü.
+                                  # Kota yeniden bollaşırsa '0 * * * *' ile eskiye dönebilirsin.
   workflow_dispatch: {}          # elle "Run workflow"
   repository_dispatch:
     types: [refresh]             # panodaki "⟳ Yenile" -> api/refresh -> buraya
@@ -26,7 +28,15 @@ jobs:
 
       - run: npm ci
 
+      # Yemeksepeti/TGO API bilgileri (.env / Secrets) tanımlıysa kaynak kodu
+      # (scripts/lib/sources/yemeksepeti.js, tgomarket.js) Playwright yolunu
+      # zaten kendisi atlıyor — bu adım o zaman hiç kullanılmayan bir Chromium
+      # kurulumuna (~1-3 dk) her koşuda boşuna zaman/Actions dakikası harcıyordu.
+      # API'lerden biri bozulup Playwright'a geçici olarak geri dönmek gerekirse
+      # repo Settings > Secrets and variables > Actions > Variables'a
+      # NEED_PLAYWRIGHT=1 ekleyip bu adımı tekrar aktif edebilirsin.
       - name: Playwright Chromium
+        if: vars.NEED_PLAYWRIGHT == '1'
         run: npx playwright install --with-deps chromium
 
       - name: topla
