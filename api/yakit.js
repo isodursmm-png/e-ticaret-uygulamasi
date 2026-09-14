@@ -110,7 +110,7 @@ module.exports = async (req, res) => {
     // için hemen sonra yapılan tekrar deneme genelde çok daha hızlı döner.
     const qs = `start=${start.toISOString().slice(0, 10)}&end=${end.toISOString().slice(0, 10)}`;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 55000);
+    const timer = setTimeout(() => ctrl.abort(), 20000);
     let fr;
     try {
       fr = await fetch(`${base}/api/yakitlar?${qs}`, {

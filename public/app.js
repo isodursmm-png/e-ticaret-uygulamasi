@@ -1185,7 +1185,7 @@ function renderYakitPanel(v, sb){
     const { start, end, etiket }=ayAraligi(f.elements.ay.value);
     const btn=f.querySelector('button[type=submit]');
     kpiRow.innerHTML=''; listHost.innerHTML=''; monthLabel.textContent='';
-    const MAX_TRY=3;
+    const MAX_TRY=6;
     try{
       const { data:{ session } }=await sb.auth.getSession();
       if(!session) throw new Error('Oturum bulunamadı, tekrar giriş yapın.');
