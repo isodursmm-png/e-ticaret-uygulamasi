@@ -1087,7 +1087,8 @@ RENDERERS.otolar=(v)=>{
     <form id="otoForm" class="oto-form">
       <label>Tarih<input type="date" name="tarih" value="${today}" required></label>
       <label>Plaka<input type="text" name="plaka" placeholder="07 AB 1234" required style="text-transform:uppercase"></label>
-      <label>Lokasyon<input type="text" name="lokasyon" placeholder="Erciyes Şubesi"></label>
+      <label>Lokasyon<input type="text" name="lokasyon" list="otoLokList" placeholder="Erciyes" autocomplete="off"></label>
+      <datalist id="otoLokList">${DIMS.store.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
       <label>Kullanıcı<input type="text" name="kullanici" placeholder="Ad Soyad"></label>
       <label>Ücret maliyeti<input type="number" step="0.01" min="0" name="ucret_maliyeti" placeholder="₺"></label>
       <label>Yakıt (L)<input type="number" step="0.01" min="0" name="yakit_litre" placeholder="L"></label>
@@ -1141,7 +1142,14 @@ RENDERERS.otolar=(v)=>{
     const num=n=>{ const x=f.elements[n].value; return x===''?null:Number(x); };
     const plaka=String(val('plaka')||'').trim().toUpperCase();
     if(!plaka){ alert('Plaka gerekli.'); return; }
-    const row={ tarih:val('tarih')||today, plaka, lokasyon:val('lokasyon'), kullanici:val('kullanici'),
+    // lokasyonu bilinen mağaza listesiyle eşleştir (yazım farkı olsa da tek adla özdeşleşsin)
+    let lokasyon=String(val('lokasyon')||'').trim();
+    if(lokasyon){
+      const lc=lokasyon.toLowerCase();
+      const hit=DIMS.store.find(s=>s.toLowerCase()===lc) || DIMS.store.find(s=>lc.includes(s.toLowerCase()));
+      if(hit) lokasyon=hit;
+    }
+    const row={ tarih:val('tarih')||today, plaka, lokasyon:lokasyon||null, kullanici:val('kullanici'),
       ucret_maliyeti:num('ucret_maliyeti'), yakit_litre:num('yakit_litre'), kdvli_tutar:num('kdvli_tutar') };
     const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
     const { error }=await sb.from('vehicle_logs').insert(row);
