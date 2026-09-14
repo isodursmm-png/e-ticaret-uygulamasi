@@ -1131,29 +1131,40 @@ function renderAraclarPanel(v, sb){
 }
 
 /* ---- Yakıt Alımları: Petrol Ofisi (arac_takip_sistemi proxy) — api/yakit.js ---- */
+const AY_ADLARI=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 function renderYakitPanel(v, sb){
   const now=new Date();
-  const monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
-  const today=now.toISOString().slice(0,10);
+  const curMonthVal=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
 
-  const panelEl=panel('Yakıt Alımları','Petrol Ofisi (arac_takip_sistemi) — yalnızca Araçlar listesindeki plakalar');
+  const panelEl=panel('Yakıt Alımları','Petrol Ofisi (arac_takip_sistemi) — seçilen ay için, yalnızca Araçlar listesindeki plakalar');
   panelEl.insertAdjacentHTML('beforeend', `
     <form id="yakitForm" class="oto-form">
-      <label>Başlangıç<input type="date" name="start" value="${monthStart}" required></label>
-      <label>Bitiş<input type="date" name="end" value="${today}" required></label>
+      <label>Ay<input type="month" name="ay" value="${curMonthVal}" required></label>
       <button type="submit" class="tb-btn act">⛽ Çek</button>
     </form>`);
-  const kpiRow=document.createElement('div'); kpiRow.className='kpirow'; kpiRow.style.marginTop='10px';
+  const monthLabel=document.createElement('div'); monthLabel.className='sub'; monthLabel.style.marginTop='10px';
+  panelEl.appendChild(monthLabel);
+  const kpiRow=document.createElement('div'); kpiRow.className='kpirow'; kpiRow.style.marginTop='6px';
   panelEl.appendChild(kpiRow);
   const listHost=document.createElement('div'); listHost.id='yakitList';
   panelEl.appendChild(listHost);
   v.appendChild(panelEl);
 
-  function renderKpi(byPlate){
+  function ayAraligi(monthVal){
+    const [y,m]=monthVal.split('-').map(Number);
+    const start=`${monthVal}-01`;
+    const sonGun=new Date(y,m,0).getDate();
+    let end=`${monthVal}-${String(sonGun).padStart(2,'0')}`;
+    if(monthVal===curMonthVal) end=now.toISOString().slice(0,10);   // içinde bulunduğumuz ay: bugüne kadar
+    return { start, end, etiket:`${AY_ADLARI[m-1]} ${y}` };
+  }
+
+  function renderKpi(byPlate, etiket){
     const litre=byPlate.reduce((a,r)=>a+(+r.litre||0),0);
     const tutar=byPlate.reduce((a,r)=>a+(+r.tutar||0),0);
     const islem=byPlate.reduce((a,r)=>a+(+r.islem||0),0);
     const aracSayisi=byPlate.filter(r=>r.islem>0).length;
+    monthLabel.textContent=etiket;
     kpiRow.innerHTML=kpi('Alım yapan araç',F.n(aracSayisi)+' / '+F.n(byPlate.length))+
       kpi('Toplam yakıt',F.n1(litre)+' L')+kpi('Toplam tutar',F.tl(tutar))+kpi('İşlem sayısı',F.n(islem));
   }
@@ -1171,9 +1182,9 @@ function renderYakitPanel(v, sb){
   panelEl.querySelector('#yakitForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f=e.target;
-    const start=f.elements.start.value, end=f.elements.end.value;
+    const { start, end, etiket }=ayAraligi(f.elements.ay.value);
     const btn=f.querySelector('button[type=submit]');
-    kpiRow.innerHTML=''; listHost.innerHTML='';
+    kpiRow.innerHTML=''; listHost.innerHTML=''; monthLabel.textContent='';
     const MAX_TRY=3;
     try{
       const { data:{ session } }=await sb.auth.getSession();
@@ -1191,7 +1202,7 @@ function renderYakitPanel(v, sb){
         if(!retryable || attempt===MAX_TRY) throw lastErr;
         await new Promise(res=>setTimeout(res,4000));
       }
-      renderKpi(j.byPlate||[]); renderList(j.byPlate||[]);
+      renderKpi(j.byPlate||[], etiket); renderList(j.byPlate||[]);
     }catch(err){
       listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(err.message||err)+'</div>';
     }finally{
