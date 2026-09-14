@@ -1073,10 +1073,131 @@ RENDERERS.final=(v)=>{
 
 /* ============ E-TİCARET OTOLARI — filo/yakıt masraf kaydı (canlı Supabase) ============ */
 const otoFmtDate = s => { if(!s) return '—'; const p=String(s).slice(0,10).split('-'); return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:s; };
+/* ---- Araçlar: filo listesi (plaka/şube/şoför/kullanım) — public.araclar ---- */
+function renderAraclarPanel(v, sb){
+  const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, kullanım amacı');
+  panelEl.insertAdjacentHTML('beforeend', `
+    <form id="aracForm" class="oto-form">
+      <label>Plaka<input type="text" name="plaka" placeholder="07 AB 1234" required style="text-transform:uppercase"></label>
+      <label>Şube<input type="text" name="sube" list="aracSubeList" placeholder="Erciyes" autocomplete="off"></label>
+      <datalist id="aracSubeList">${DIMS.store.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
+      <label>Şoför<input type="text" name="sofor" placeholder="Ad Soyad"></label>
+      <label>Kullanım<input type="text" name="kullanim" placeholder="Dağıtım / Servis / ..."></label>
+      <button type="submit" class="tb-btn act">+ Ekle</button>
+    </form>`);
+  const listHost=document.createElement('div'); listHost.id='aracList'; listHost.textContent='Yükleniyor…';
+  panelEl.appendChild(listHost);
+  v.appendChild(panelEl);
+
+  function renderList(rows){
+    if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz araç kaydı yok</div>'; return; }
+    let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
+      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th></th></tr></thead><tbody>`;
+    rows.forEach(r=>{
+      h+=`<tr><td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td><td>${esc(r.sofor||'')}</td><td>${esc(r.kullanim||'')}</td>`+
+        `<td class="num"><button type="button" class="oto-del" data-id="${r.id}" title="Sil">✕</button></td></tr>`;
+    });
+    h+='</tbody></table></div>';
+    listHost.innerHTML=h;
+    listHost.querySelectorAll('.oto-del').forEach(b=> b.onclick=async()=>{
+      if(!confirm('Bu aracı silmek istiyor musunuz?')) return;
+      b.disabled=true;
+      const { error }=await sb.from('araclar').delete().eq('id',b.dataset.id);
+      if(error){ alert('Silinemedi: '+error.message); b.disabled=false; return; }
+      refresh();
+    });
+  }
+  async function refresh(){
+    listHost.textContent='Yükleniyor…';
+    const { data, error }=await sb.from('araclar').select('*').order('plaka',{ascending:true});
+    if(error){ listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(error.message)+'</div>'; return; }
+    renderList(data||[]);
+    return data||[];
+  }
+  panelEl.querySelector('#aracForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const f=e.target;
+    const val=n=>{ const x=f.elements[n].value; return x===''?null:x; };
+    const plaka=String(val('plaka')||'').trim().toUpperCase();
+    if(!plaka){ alert('Plaka gerekli.'); return; }
+    const row={ plaka, sube:val('sube'), sofor:val('sofor'), kullanim:val('kullanim') };
+    const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
+    const { error }=await sb.from('araclar').insert(row);
+    btn.disabled=false;
+    if(error){ alert('Eklenemedi: '+error.message); return; }
+    f.reset();
+    refresh();
+  });
+  refresh();
+}
+
+/* ---- Yakıt Alımları: Petrol Ofisi (arac_takip_sistemi proxy) — api/yakit.js ---- */
+function renderYakitPanel(v, sb){
+  const now=new Date();
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
+  const today=now.toISOString().slice(0,10);
+
+  const panelEl=panel('Yakıt Alımları','Petrol Ofisi (arac_takip_sistemi) — yalnızca Araçlar listesindeki plakalar');
+  panelEl.insertAdjacentHTML('beforeend', `
+    <form id="yakitForm" class="oto-form">
+      <label>Başlangıç<input type="date" name="start" value="${monthStart}" required></label>
+      <label>Bitiş<input type="date" name="end" value="${today}" required></label>
+      <button type="submit" class="tb-btn act">⛽ Çek</button>
+    </form>`);
+  const kpiRow=document.createElement('div'); kpiRow.className='kpirow'; kpiRow.style.marginTop='10px';
+  panelEl.appendChild(kpiRow);
+  const listHost=document.createElement('div'); listHost.id='yakitList';
+  panelEl.appendChild(listHost);
+  v.appendChild(panelEl);
+
+  function renderKpi(byPlate){
+    const litre=byPlate.reduce((a,r)=>a+(+r.litre||0),0);
+    const tutar=byPlate.reduce((a,r)=>a+(+r.tutar||0),0);
+    const islem=byPlate.reduce((a,r)=>a+(+r.islem||0),0);
+    const aracSayisi=byPlate.filter(r=>r.islem>0).length;
+    kpiRow.innerHTML=kpi('Alım yapan araç',F.n(aracSayisi)+' / '+F.n(byPlate.length))+
+      kpi('Toplam yakıt',F.n1(litre)+' L')+kpi('Toplam tutar',F.tl(tutar))+kpi('İşlem sayısı',F.n(islem));
+  }
+  function renderList(byPlate){
+    if(!byPlate.length){ listHost.innerHTML='<div class="miss">Araçlar listesi boş — önce bir araç ekleyin.</div>'; return; }
+    let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
+      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Litre</th><th>Tutar</th><th>İşlem</th></tr></thead><tbody>`;
+    byPlate.forEach(r=>{
+      h+=`<tr><td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td><td>${esc(r.sofor||'')}</td>`+
+        `<td class="num">${F.n1(r.litre)} L</td><td class="num">${F.tl(r.tutar)}</td><td class="num">${F.n(r.islem)}</td></tr>`;
+    });
+    h+='</tbody></table></div>';
+    listHost.innerHTML=h;
+  }
+  panelEl.querySelector('#yakitForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const f=e.target;
+    const start=f.elements.start.value, end=f.elements.end.value;
+    const btn=f.querySelector('button[type=submit]');
+    btn.disabled=true; btn.textContent='⏳ Çekiliyor… (Render uykudaysa 1-2 dk sürebilir)';
+    kpiRow.innerHTML=''; listHost.innerHTML='';
+    try{
+      const { data:{ session } }=await sb.auth.getSession();
+      if(!session) throw new Error('Oturum bulunamadı, tekrar giriş yapın.');
+      const r=await fetch(`/api/yakit?start=${start}&end=${end}`, { headers:{ Authorization:'Bearer '+session.access_token } });
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok || j.ok===false) throw new Error(j.error||('HTTP '+r.status));
+      renderKpi(j.byPlate||[]); renderList(j.byPlate||[]);
+    }catch(err){
+      listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(err.message||err)+'</div>';
+    }finally{
+      btn.disabled=false; btn.textContent='⛽ Çek';
+    }
+  });
+}
+
 RENDERERS.otolar=(v)=>{
   const sb=window.__SB__;
   if(!sb){ const m=document.createElement('div'); m.className='miss'; m.textContent='Supabase bağlantısı yok.'; v.appendChild(m); return; }
   const today=new Date().toISOString().slice(0,10);
+
+  renderAraclarPanel(v, sb);
+  renderYakitPanel(v, sb);
 
   const kpiRow=document.createElement('div'); kpiRow.className='kpirow'; kpiRow.id='otoKpi';
   kpiRow.innerHTML=kpi('Kayıt sayısı','…')+kpi('Toplam ücret maliyeti','…')+kpi('Toplam yakıt','…')+kpi("Toplam KDV'li tutar",'…');

@@ -111,3 +111,32 @@ create policy "authenticated_all"
   to authenticated
   using (true)
   with check (true);
+
+-- ============================================================================
+--  ARAÇLAR  —  filo kaydı (plaka, şube, şoför, kullanım amacı)
+--  ----------------------------------------------------------------------------
+--  "E-Ticaret Otoları" sayfasındaki araç listesi. api/yakit.js bu tablodaki
+--  plakaları arac_takip_sistemi'nden (Petrol Ofisi) çekilen yakıt alımlarıyla
+--  eşleştirmek için service_role ile okur; tarayıcı ise doğrudan (anon anahtar
+--  + oturum) okur/yazar — vehicle_logs ile aynı yetki modeli.
+-- ============================================================================
+create table if not exists public.araclar (
+  id          bigint generated always as identity primary key,
+  created_at  timestamptz not null default now(),
+  plaka       text        not null,
+  sube        text,
+  sofor       text,
+  kullanim    text
+);
+
+create index if not exists araclar_plaka_idx on public.araclar (plaka);
+
+alter table public.araclar enable row level security;
+
+drop policy if exists "authenticated_all" on public.araclar;
+create policy "authenticated_all"
+  on public.araclar
+  for all
+  to authenticated
+  using (true)
+  with check (true);

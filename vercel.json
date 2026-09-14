@@ -6,6 +6,7 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "functions": {
-    "api/refresh.js": { "maxDuration": 30 }
+    "api/refresh.js": { "maxDuration": 30 },
+    "api/yakit.js": { "maxDuration": 90 }
   }
 }
