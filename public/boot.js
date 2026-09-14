@@ -68,23 +68,21 @@ async function start(_session) {
   hideGate();
   msg.textContent = '';
   try {
-    // 'eticaret' ana satırı + varsa 'eticaret~pN' parça satırları (tüm-geçmiş payload'ı)
-    const { data: rows, error } = await supabase
-      .from('analytics_payload')
-      .select('id, data, geo')
-      .like('id', 'eticaret%')
-      .order('id', { ascending: true });
+    // 'eticaret' ana satırı ÖNCE tek başına (küçük: {__chunks:N} + geo + meta).
+    // Tüm parça satırlarını TEK sorguda çekmek (eski hâl) 10+ parçada ~20 MB
+    // ediyor ve Postgres statement_timeout'a takılıyordu ("canceling statement
+    // due to statement timeout") — her parça artık AYRI, küçük bir sorguyla
+    // (paralel) çekiliyor; hiçbiri tek başına timeout sınırına yaklaşmıyor.
+    const { data: main, error } = await supabase
+      .from('analytics_payload').select('data, geo').eq('id', 'eticaret').maybeSingle();
     if (error) throw error;
-    const main = (rows || []).find((r) => r.id === 'eticaret');
     if (!main || !main.data) throw new Error('analytics_payload boş — önce "npm run topla" / "rebuild-from-raw" çalıştırın');
 
     let pl = main.data;
-    if (pl && pl.__chunks != null) {                       // parçalı: birleştir → gunzip
-      const parts = (rows || [])
-        .filter((r) => /^eticaret~p\d+$/.test(r.id))
-        .sort((a, b) => (+a.id.slice(10)) - (+b.id.slice(10)))
-        .map((r) => r.data && r.data.__part).join('');
-      pl = JSON.parse(await gunzipB64(parts));
+    if (pl && pl.__chunks != null) {                       // parçalı: her parçayı ayrı çek → birleştir → gunzip
+      const n = pl.__chunks;
+      const parts = await fetchChunksLimited(n, 3);
+      pl = JSON.parse(await gunzipB64(parts.join('')));
     } else if (pl && pl.__gz) {                            // tek parça gzip
       pl = JSON.parse(await gunzipB64(pl.__gz));
     }
@@ -166,6 +164,31 @@ async function mountRefresh() {
       setTimeout(() => { b.disabled = false; b.textContent = label; }, 2500);
     }
   });
+}
+
+/** eticaret~p0..n-1 satırlarını sınırlı eşzamanlılıkla (havuz) çeker; her
+    parça ayrı, küçük bir sorgu olduğundan tek tek statement_timeout'a
+    takılmaz. Tek bir parça yine de zaman aşımına uğrarsa kısa beklemeyle
+    2 kez daha dener (geçici bağlantı/kuyruk baskısı olabilir). */
+async function fetchChunksLimited(n, concurrency) {
+  const results = new Array(n);
+  let next = 0;
+  async function fetchOne(i) {
+    let lastErr;
+    for (let t = 0; t < 3; t++) {
+      const { data: p, error: pe } = await supabase
+        .from('analytics_payload').select('data').eq('id', `eticaret~p${i}`).maybeSingle();
+      if (!pe && p && p.data && p.data.__part) return p.data.__part;
+      lastErr = pe ? new Error(`parça ${i}: ${pe.message}`) : new Error(`parça ${i} eksik`);
+      if (t < 2) await new Promise((r) => setTimeout(r, 1200 * (t + 1)));
+    }
+    throw lastErr;
+  }
+  async function worker() {
+    while (next < n) { const i = next++; results[i] = await fetchOne(i); }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, n) }, worker));
+  return results;
 }
 
 /** base64(gzip(json)) → json metni. Modern tarayıcı DecompressionStream'i ile. */
