@@ -18,6 +18,7 @@ if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
 const supabase = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true }
 });
+window.__SB__ = supabase;   // app.js — canlı yazılabilir bölümler (ör. "E-Ticaret Otoları") için
 
 const gate   = document.getElementById('authGate');
 const shell  = document.getElementById('appShell');

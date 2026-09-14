@@ -75,3 +75,39 @@ create policy "read_authenticated"
   for select
   to authenticated
   using (true);
+
+-- ============================================================================
+--  E-TİCARET OTOLARI  —  vehicle_logs
+--  ----------------------------------------------------------------------------
+--  Panodaki "E-Ticaret Otoları" segmenti — filo/yakıt masraf kaydı. Doğrudan
+--  tarayıcıdan (anon anahtar + oturum) yazılır/okunur; import/topla.js'e
+--  gerek yok. Giriş yapmış her kullanıcı ekleyebilir/görebilir/silebilir
+--  (küçük, güvenilir bir ekip için yeterli — daha dar yetki isterseniz
+--  aşağıdaki policy'leri daraltın, ör. yalnız kendi kaydını silebilsin).
+-- ============================================================================
+create table if not exists public.vehicle_logs (
+  id              bigint generated always as identity primary key,
+  tarih           date        not null default current_date,
+  plaka           text        not null,
+  lokasyon        text,
+  kullanici       text,
+  ucret_maliyeti  numeric,                 -- kiralama/servis vb. ücret maliyeti
+  yakit_litre     numeric,                 -- yakıt (litre)
+  kdvli_tutar     numeric,                 -- KDV'li tutar (₺)
+  created_by      uuid        references auth.users(id),
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+create index if not exists vehicle_logs_tarih_idx on public.vehicle_logs (tarih);
+create index if not exists vehicle_logs_plaka_idx on public.vehicle_logs (plaka);
+
+alter table public.vehicle_logs enable row level security;
+
+drop policy if exists "authenticated_all" on public.vehicle_logs;
+create policy "authenticated_all"
+  on public.vehicle_logs
+  for all
+  to authenticated
+  using (true)
+  with check (true);

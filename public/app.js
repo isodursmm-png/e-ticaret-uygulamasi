@@ -724,6 +724,7 @@ function turkeyMapSVG(rows){
 const SECTIONS=[
   {grp:'ÖZET', items:[['genel','Genel Bakış','▨']]},
   {grp:'FİNAL', items:[['final','Final — Kâr / Zarar','◈']]},
+  {grp:'E-TİCARET OTOLARI', items:[['otolar','E-Ticaret Otoları','🚚']]},
   {grp:'SATIŞ', items:[['ciro','Ciro & Kümülatif','₺'],['siparis','Sipariş & Adet','#']]},
   {grp:'OPERASYON', items:[['teslimat','Teslimatlar','⇲'],['zaman','Sipariş & Teslim Saati','◔']]},
   {grp:'MÜŞTERİ', items:[['musteri','Müşteri / CRM','☺']]},
@@ -733,7 +734,7 @@ const SECTIONS=[
   {grp:'VERİ', items:[['veri','Ham Veri & Dışa Aktar','⤓']]}
 ];
 const TITLES=Object.fromEntries(SECTIONS.flatMap(s=>s.items.map(i=>[i[0],i[1]])));
-const GRP_COL={'ÖZET':'--accent','FİNAL':'--good','SATIŞ':'--s1','OPERASYON':'--s4','MÜŞTERİ':'--s5','DAĞITIM':'--s3','KAYNAK':'--s7','MATRİS':'--s2','VERİ':'--muted'};
+const GRP_COL={'ÖZET':'--accent','FİNAL':'--good','E-TİCARET OTOLARI':'--s8','SATIŞ':'--s1','OPERASYON':'--s4','MÜŞTERİ':'--s5','DAĞITIM':'--s3','KAYNAK':'--s7','MATRİS':'--s2','VERİ':'--muted'};
 
 function kpi(k,v,s,cls){ return `<div class="kpi"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>${s?`<div class="s ${cls||''}">${esc(s)}</div>`:''}</div>`; }
 function kpirow(html){ const d=document.createElement('div'); d.className='kpirow'; d.innerHTML=html; return d; }
@@ -1068,6 +1069,88 @@ RENDERERS.final=(v)=>{
   const magSub=magPanel.querySelector('.sub');
   if(magSub) magSub.after(sel); else magPanel.prepend(sel);
   v.appendChild(magPanel);
+};
+
+/* ============ E-TİCARET OTOLARI — filo/yakıt masraf kaydı (canlı Supabase) ============ */
+const otoFmtDate = s => { if(!s) return '—'; const p=String(s).slice(0,10).split('-'); return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:s; };
+RENDERERS.otolar=(v)=>{
+  const sb=window.__SB__;
+  if(!sb){ const m=document.createElement('div'); m.className='miss'; m.textContent='Supabase bağlantısı yok.'; v.appendChild(m); return; }
+  const today=new Date().toISOString().slice(0,10);
+
+  const kpiRow=document.createElement('div'); kpiRow.className='kpirow'; kpiRow.id='otoKpi';
+  kpiRow.innerHTML=kpi('Kayıt sayısı','…')+kpi('Toplam ücret maliyeti','…')+kpi('Toplam yakıt','…')+kpi("Toplam KDV'li tutar",'…');
+  v.appendChild(kpiRow);
+
+  const formPanel=panel('Yeni kayıt','Plaka, lokasyon, kullanıcı, ücret maliyeti, yakıt (L), KDV\'li tutar');
+  formPanel.insertAdjacentHTML('beforeend', `
+    <form id="otoForm" class="oto-form">
+      <label>Tarih<input type="date" name="tarih" value="${today}" required></label>
+      <label>Plaka<input type="text" name="plaka" placeholder="07 AB 1234" required style="text-transform:uppercase"></label>
+      <label>Lokasyon<input type="text" name="lokasyon" placeholder="Erciyes Şubesi"></label>
+      <label>Kullanıcı<input type="text" name="kullanici" placeholder="Ad Soyad"></label>
+      <label>Ücret maliyeti<input type="number" step="0.01" min="0" name="ucret_maliyeti" placeholder="₺"></label>
+      <label>Yakıt (L)<input type="number" step="0.01" min="0" name="yakit_litre" placeholder="L"></label>
+      <label>KDV'li tutar<input type="number" step="0.01" min="0" name="kdvli_tutar" placeholder="₺"></label>
+      <button type="submit" class="tb-btn act">+ Ekle</button>
+    </form>`);
+  v.appendChild(formPanel);
+
+  const listPanel=panel('Kayıtlar','En yeni üstte');
+  const listHost=document.createElement('div'); listHost.id='otoList'; listHost.textContent='Yükleniyor…';
+  listPanel.appendChild(listHost);
+  v.appendChild(listPanel);
+
+  function renderKpi(rows){
+    const sum=k=>rows.reduce((a,r)=>a+(+r[k]||0),0);
+    kpiRow.innerHTML=kpi('Kayıt sayısı',F.n(rows.length))+kpi('Toplam ücret maliyeti',F.tl(sum('ucret_maliyeti')))+
+      kpi('Toplam yakıt',F.n1(sum('yakit_litre'))+' L')+kpi("Toplam KDV'li tutar",F.tl(sum('kdvli_tutar')));
+  }
+  function renderList(rows){
+    if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz kayıt yok</div>'; return; }
+    let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
+      `<th>Tarih</th><th>Plaka</th><th>Lokasyon</th><th>Kullanıcı</th>`+
+      `<th>Ücret maliyeti</th><th>Yakıt (L)</th><th>KDV'li tutar</th><th></th></tr></thead><tbody>`;
+    rows.forEach(r=>{
+      h+=`<tr><td class="num">${esc(otoFmtDate(r.tarih))}</td><td>${esc(r.plaka||'')}</td><td>${esc(r.lokasyon||'')}</td>`+
+        `<td>${esc(r.kullanici||'')}</td><td class="num">${r.ucret_maliyeti!=null?esc(F.tl(r.ucret_maliyeti)):'—'}</td>`+
+        `<td class="num">${r.yakit_litre!=null?esc(F.n1(r.yakit_litre)):'—'}</td>`+
+        `<td class="num">${r.kdvli_tutar!=null?esc(F.tl(r.kdvli_tutar)):'—'}</td>`+
+        `<td class="num"><button type="button" class="oto-del" data-id="${r.id}" title="Sil">✕</button></td></tr>`;
+    });
+    h+='</tbody></table></div>';
+    listHost.innerHTML=h;
+    listHost.querySelectorAll('.oto-del').forEach(b=> b.onclick=async()=>{
+      if(!confirm('Bu kaydı silmek istiyor musunuz?')) return;
+      b.disabled=true;
+      const { error }=await sb.from('vehicle_logs').delete().eq('id',b.dataset.id);
+      if(error){ alert('Silinemedi: '+error.message); b.disabled=false; return; }
+      refresh();
+    });
+  }
+  async function refresh(){
+    listHost.textContent='Yükleniyor…';
+    const { data, error }=await sb.from('vehicle_logs').select('*').order('tarih',{ascending:false}).order('id',{ascending:false}).limit(1000);
+    if(error){ listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(error.message)+'</div>'; return; }
+    renderKpi(data||[]); renderList(data||[]);
+  }
+  formPanel.querySelector('#otoForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const f=e.target;
+    const val=n=>{ const x=f.elements[n].value; return x===''?null:x; };
+    const num=n=>{ const x=f.elements[n].value; return x===''?null:Number(x); };
+    const plaka=String(val('plaka')||'').trim().toUpperCase();
+    if(!plaka){ alert('Plaka gerekli.'); return; }
+    const row={ tarih:val('tarih')||today, plaka, lokasyon:val('lokasyon'), kullanici:val('kullanici'),
+      ucret_maliyeti:num('ucret_maliyeti'), yakit_litre:num('yakit_litre'), kdvli_tutar:num('kdvli_tutar') };
+    const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
+    const { error }=await sb.from('vehicle_logs').insert(row);
+    btn.disabled=false;
+    if(error){ alert('Eklenemedi: '+error.message); return; }
+    f.reset(); f.elements['tarih'].value=today;
+    refresh();
+  });
+  refresh();
 };
 
 RENDERERS.ciro=(v)=>{
