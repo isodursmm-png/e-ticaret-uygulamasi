@@ -9,7 +9,8 @@ const ITM = PL.itm.map(r => { const o = {}; PL.itmCols.forEach((c,i)=>o[c]=r[i])
 const CH = ['Ticimax','Yemeksepeti','Trendyol'];
 const CH_COL = { Ticimax:'--s1', Yemeksepeti:'--s2', Trendyol:'--s3' };
 
-/* FİNAL — SMM (satılan malın maliyeti) oranı: ciro × oran (kanal bazlı) */
+/* FİNAL — SMM (satılan malın maliyeti): kanal "dilimi" (kâr payı) oranı.
+   SMM = ciro × (1 − oran).  Örn. %35 dilim → 100−35=65 → SMM = ciro × 0,65. */
 const SMM_RATE = { Ticimax:0.20, Yemeksepeti:0.35, Trendyol:0.35 };
 const SMM_DEF  = 0.30;   // tanımsız kanal için
 /* Aylık TÜİK TÜFE (bir önceki aya göre %) — boot.js analytics_payload'tan doldurur */
@@ -962,7 +963,7 @@ function finRows(O, dim){
     const k=rv+'|'+mon; let r=m.get(k);
     if(!r){ r={rv,mon,ciro:0,smm:0,kom:0}; m.set(k,r); }
     r.ciro+=o.ciro||0;
-    r.smm +=(o.ciro||0)*(SMM_RATE[o.ch]!=null?SMM_RATE[o.ch]:SMM_DEF);
+    r.smm +=(o.ciro||0)*(1-(SMM_RATE[o.ch]!=null?SMM_RATE[o.ch]:SMM_DEF));
     r.kom +=o.kom||0;
   }
   const tot=new Map();
@@ -1015,12 +1016,12 @@ RENDERERS.final=(v)=>{
   const T=R.reduce((a,r)=>{ a.ciro+=r.ciro;a.smm+=r.smm;a.gid+=r.gid;a.kz+=r.kz; return a; },{ciro:0,smm:0,gid:0,kz:0});
   v.appendChild(kpirow(
     kpi('Ciro (teslim edilen)',F.tl(T.ciro),F.mon(PL.meta.minDate)+' →')+
-    kpi('SMM',F.tl(T.smm),'Ticimax %20 · YS/Trendyol %35')+
+    kpi('SMM',F.tl(T.smm),'Ticimax ×0,80 · YS/Trendyol ×0,65')+
     kpi('Giderler',F.tl(T.gid),'komisyon + oto masrafı')+
     kpi('Kâr / Zarar',F.tl(T.kz), T.kz>=0?'kâr':'zarar', T.kz>=0?'up':'down')
   ));
   const nt=document.createElement('div'); nt.className='note';
-  nt.innerHTML='<b>SMM</b> = ciro × oran (Ticimax %20, Yemeksepeti %35, Trendyol %35). '+
+  nt.innerHTML='<b>SMM</b> = ciro × (1 − dilim). Dilim: Ticimax %20 → ×0,80, Yemeksepeti %35 → ×0,65, Trendyol %35 → ×0,65. '+
     '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b> hücresine yazıp <b>Enter</b> — bu tarayıcıda saklanır. '+
     '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı). '+
     '<b>Enf. %</b> TÜİK aylık TÜFE — bilgi amaçlı, kâr/zarara dahil değildir.';
