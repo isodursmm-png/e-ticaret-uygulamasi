@@ -77,6 +77,7 @@ jobs:
           TGO_API_SECRET: ${{ secrets.TGO_API_SECRET }}
           TGO_API_BASE: ${{ vars.TGO_API_BASE }}
           TGO_ORDER_PATH: ${{ vars.TGO_ORDER_PATH }}
+          TGO_KOMISYON_DAYS: ${{ vars.TGO_KOMISYON_DAYS || '60' }}
 
           TGO_USER: ${{ secrets.TGO_USER }}
           TGO_PASS: ${{ secrets.TGO_PASS }}

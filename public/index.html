@@ -150,18 +150,18 @@ button{font:inherit; cursor:pointer}
 .tb-btn:hover{border-color:var(--accent); color:var(--accent)}
 .tb-btn.act{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
 
-/* ---- dönem hızlı seçimi (tüm sayfalarda) ---- */
-.daterange{display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px}
-.daterange .drlbl{font-size:7px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-right:2px}
-.dr-btn{display:inline-flex; align-items:center; gap:4px; border:0; border-radius:999px;
-  padding:5px 10px; font:inherit; font-size:9px; font-weight:700; color:#fff; cursor:pointer;
+/* ---- dönem hızlı seçimi (tüm sayfalarda) — %50 büyütülmüş ---- */
+.daterange{display:flex; gap:9px; flex-wrap:wrap; align-items:center; margin-top:12px}
+.daterange .drlbl{font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-right:3px}
+.dr-btn{display:inline-flex; align-items:center; gap:6px; border:0; border-radius:999px;
+  padding:8px 15px; font:inherit; font-size:13.5px; font-weight:700; color:#fff; cursor:pointer;
   box-shadow:0 1px 6px rgba(0,0,0,.22); transition:transform .08s ease, filter .15s ease}
 .dr-btn:hover{filter:brightness(1.1); transform:translateY(-1px)}
 .dr-btn.on{outline:2px solid var(--ink); outline-offset:1px; filter:brightness(1.06)}
 .dr-ay{background:linear-gradient(135deg,#6366f1,#8b5cf6)}
 .dr-hf{background:linear-gradient(135deg,#0ea5e9,#22d3ee)}
-.dr-sel{font:inherit; font-size:9px; font-weight:700; color:#fff; cursor:pointer;
-  border:0; border-radius:999px; padding:5px 9px; box-shadow:0 1px 6px rgba(0,0,0,.22);
+.dr-sel{font:inherit; font-size:13.5px; font-weight:700; color:#fff; cursor:pointer;
+  border:0; border-radius:999px; padding:8px 14px; box-shadow:0 1px 6px rgba(0,0,0,.22);
   background:linear-gradient(135deg,#0d9488,#0891b2); -webkit-appearance:none; appearance:none;
   transition:transform .08s ease, filter .15s ease}
 .dr-sel:hover{filter:brightness(1.1); transform:translateY(-1px)}
@@ -172,17 +172,17 @@ button{font:inherit; cursor:pointer}
 .dr-ta{background:linear-gradient(135deg,#f59e0b,#f97316)}
 .dr-all{background:linear-gradient(135deg,#10b981,#059669)}
 .dr-nav{background:var(--surface-2); color:var(--ink); box-shadow:none;
-  padding:5px 9px; font-size:13px; line-height:1}
+  padding:8px 14px; font-size:19.5px; line-height:1}
 .dr-nav:disabled{opacity:.35; cursor:default; transform:none; filter:none}
-.dr-inputs{display:none; gap:4px; align-items:center; color:var(--ink-2); font-size:8.5px}
+.dr-inputs{display:none; gap:6px; align-items:center; color:var(--ink-2); font-size:13px}
 .dr-inputs.open{display:inline-flex}
-.dr-inputs input{padding:4px 6px; border:1px solid var(--hair-strong); border-radius:6px;
-  background:var(--surface-2); color:var(--ink); font:inherit; font-size:8.5px}
-.chips{display:flex; gap:4px; flex-wrap:wrap; margin-top:7px}
-.chip{font-size:8px; padding:3px 6px; border-radius:999px; background:var(--surface-2);
-  border:1px solid var(--hair); color:var(--ink-2); display:inline-flex; gap:5px; align-items:center}
+.dr-inputs input{padding:6px 9px; border:1px solid var(--hair-strong); border-radius:8px;
+  background:var(--surface-2); color:var(--ink); font:inherit; font-size:13px}
+.chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:11px}
+.chip{font-size:12px; padding:5px 9px; border-radius:999px; background:var(--surface-2);
+  border:1px solid var(--hair); color:var(--ink-2); display:inline-flex; gap:8px; align-items:center}
 .chip b{font-weight:600; color:var(--ink)}
-.chip button{border:0; background:transparent; color:var(--muted); font-size:9px; line-height:1; padding:0}
+.chip button{border:0; background:transparent; color:var(--muted); font-size:13.5px; line-height:1; padding:0}
 .chip button:hover{color:var(--crit)}
 
 .filters{display:none; margin-top:14px; padding:16px; background:var(--panel); border:1px solid var(--panel-line);
@@ -274,6 +274,9 @@ input.fin-oto:focus{outline:none; border-color:var(--good); box-shadow:0 0 0 3px
 .fin-tb-e.on{background:var(--good); border-color:var(--good); color:#fff; box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 30%,transparent)}
 .fin-tb-h.on{background:var(--crit); border-color:var(--crit); color:#fff; box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 30%,transparent)}
 .fin-src{margin-left:auto; font-size:11px; color:var(--muted)}
+.fin-storesel{display:block; margin:0 0 10px; font:inherit; font-size:12.5px; font-weight:600; color:var(--ink);
+  background:var(--surface); border:1px solid var(--hair-strong); border-radius:8px; padding:6px 10px; cursor:pointer; max-width:280px}
+.fin-storesel:focus{outline:none; border-color:var(--good); box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 30%,transparent)}
 .pgr{display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:10px; font-size:12px; color:var(--ink-2)}
 .pgr button{border:1px solid var(--hair-strong); background:var(--surface); border-radius:7px; padding:4px 10px; color:var(--ink-2)}
 .pgr button:disabled{opacity:.4; cursor:default}

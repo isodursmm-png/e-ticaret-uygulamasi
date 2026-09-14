@@ -15,10 +15,13 @@ const SMM_RATE = { Ticimax:0.20, Yemeksepeti:0.35, Trendyol:0.35 };
 const SMM_DEF  = 0.30;   // tanımsız kanal için
 /* Aylık TÜİK TÜFE (bir önceki aya göre %) — boot.js analytics_payload'tan doldurur */
 const TUFE = (window.__TUFE__ && window.__TUFE__.monthly) || {};
-/* "Oto masrafları" — manuel, tarayıcıda saklanır (dim: 'ch' | 'store') */
-const _otoKey = (dim,row,mon) => `eta.final.oto.${dim}.${row}.${mon}`;
-function otoGet(dim,row,mon){ try{ return +localStorage.getItem(_otoKey(dim,row,mon))||0; }catch(e){ return 0; } }
-function otoSet(dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_otoKey(dim,row,mon),String(val)) : localStorage.removeItem(_otoKey(dim,row,mon)); }catch(e){} }
+/* Manuel gider alanları — "oto" (oto masrafı) ve "gider" (diğer giderler),
+   tarayıcıda saklanır (dim: 'ch' | 'store'), Enter'da kaydedilir. */
+const _manKey = (field,dim,row,mon) => `eta.final.${field}.${dim}.${row}.${mon}`;
+function manGet(field,dim,row,mon){ try{ return +localStorage.getItem(_manKey(field,dim,row,mon))||0; }catch(e){ return 0; } }
+function manSet(field,dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_manKey(field,dim,row,mon),String(val)) : localStorage.removeItem(_manKey(field,dim,row,mon)); }catch(e){} }
+const otoGet=(dim,row,mon)=>manGet('oto',dim,row,mon), otoSet=(dim,row,mon,v)=>manSet('oto',dim,row,mon,v);
+const giderGet=(dim,row,mon)=>manGet('gider',dim,row,mon), giderSet=(dim,row,mon,v)=>manSet('gider',dim,row,mon,v);
 /* Enflasyonu Kâr/Zarar'a dahil et mi? [E]/[H] — global, tarayıcıda saklanır */
 const _enfKey='eta.final.enfDahil';
 function enfGet(){ try{ return localStorage.getItem(_enfKey)==='1'; }catch(e){ return false; } }
@@ -977,21 +980,22 @@ function finRows(O, dim, enfDahil){
   for(const r of m.values()) tot.set(r.rv,(tot.get(r.rv)||0)+r.ciro);
   const ord=[...tot.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
   return [...m.values()]
-    .map(r=>{ const oto=otoGet(dim,r.rv,r.mon), gid=r.kom+oto, enf=TUFE[r.mon];
+    .map(r=>{ const oto=otoGet(dim,r.rv,r.mon), other=giderGet(dim,r.rv,r.mon), gid=r.kom+oto+other, enf=TUFE[r.mon];
       const enfAdj = (enfDahil && enf!=null) ? r.ciro*enf/100 : 0;
-      return {...r, oto, gid, enf, enfAdj, kz:r.ciro-r.smm-gid-enfAdj}; })
+      return {...r, oto, other, gid, enf, enfAdj, kz:r.ciro-r.smm-gid-enfAdj}; })
     .sort((a,b)=> ord.indexOf(a.rv)-ord.indexOf(b.rv) || (a.mon<b.mon?1:a.mon>b.mon?-1:0));
 }
-function finTable(O, dim, label, enfDahil){
-  const rows=finRows(O,dim,enfDahil);
+function finTable(O, dim, label, enfDahil, storeFilter){
+  let rows=finRows(O,dim,enfDahil);
+  if(dim==='store' && storeFilter) rows=rows.filter(r=>r.rv===storeFilter);
   const w=document.createElement('div');
   if(!rows.length){ w.className='miss'; w.textContent='Veri yok'; return w; }
-  const T=rows.reduce((a,r)=>{ a.ciro+=r.ciro;a.smm+=r.smm;a.kom+=r.kom;a.oto+=r.oto;a.gid+=r.gid;a.kz+=r.kz; return a; },
-                      {ciro:0,smm:0,kom:0,oto:0,gid:0,kz:0});
+  const T=rows.reduce((a,r)=>{ a.ciro+=r.ciro;a.smm+=r.smm;a.kom+=r.kom;a.oto+=r.oto;a.other+=r.other;a.gid+=r.gid;a.kz+=r.kz; return a; },
+                      {ciro:0,smm:0,kom:0,oto:0,other:0,gid:0,kz:0});
   const kzc=x=> x>=0?'color:var(--good)':'color:var(--crit)';
   let h=`<div class="tbl-scroll"><table class="dt fin"><thead><tr>`+
     `<th>${esc(label)}</th><th>Ay</th><th>Ciro</th><th>SMM</th><th>Komisyon</th>`+
-    `<th>Oto masrafı</th><th>Giderler</th><th>Enf. %</th><th>Kâr / Zarar</th></tr></thead><tbody>`;
+    `<th>Oto masrafı</th><th>Diğer gider</th><th>Giderler</th><th>Enf. %</th><th>Kâr / Zarar</th></tr></thead><tbody>`;
   let prev=null;
   rows.forEach(r=>{
     const first = r.rv!==prev; prev=r.rv;
@@ -1002,6 +1006,7 @@ function finTable(O, dim, label, enfDahil){
       `<td class="num">${esc(F.tl(r.smm))}</td>`+
       `<td class="num">${esc(F.tl(r.kom))}</td>`+
       `<td class="num"><input class="fin-oto" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.oto?esc(F.n(r.oto)):''}" placeholder="0"></td>`+
+      `<td class="num"><input class="fin-oto fin-gider" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.other?esc(F.n(r.other)):''}" placeholder="0"></td>`+
       `<td class="num">${esc(F.tl(r.gid))}</td>`+
       `<td class="num">${r.enf!=null?esc(F.n1(r.enf))+'%'+(r.enfAdj>0?' <span class="fin-enfon" title="Kâr/Zarardan düşüldü">↓</span>':''):'—'}</td>`+
       `<td class="num" style="${kzc(r.kz)};font-weight:700">${esc(F.tl(r.kz))}</td></tr>`;
@@ -1009,10 +1014,15 @@ function finTable(O, dim, label, enfDahil){
   h+=`</tbody><tfoot><tr><td>Toplam</td><td></td>`+
     `<td class="num">${esc(F.tl(T.ciro))}</td><td class="num">${esc(F.tl(T.smm))}</td>`+
     `<td class="num">${esc(F.tl(T.kom))}</td><td class="num">${esc(F.tl(T.oto))}</td>`+
+    `<td class="num">${esc(F.tl(T.other))}</td>`+
     `<td class="num">${esc(F.tl(T.gid))}</td><td class="num">—</td>`+
     `<td class="num" style="${kzc(T.kz)};font-weight:800">${esc(F.tl(T.kz))}</td></tr></tfoot></table></div>`;
   w.innerHTML=h;
-  w.querySelectorAll('input.fin-oto').forEach(inp=>{
+  w.querySelectorAll('input.fin-gider').forEach(inp=>{
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
+    inp.addEventListener('change',()=>{ giderSet(dim, inp.dataset.rv, inp.dataset.mon, parseTRNum(inp.value)); render(); });
+  });
+  w.querySelectorAll('input.fin-oto:not(.fin-gider)').forEach(inp=>{
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
     inp.addEventListener('change',()=>{ otoSet(dim, inp.dataset.rv, inp.dataset.mon, parseTRNum(inp.value)); render(); });
   });
@@ -1026,7 +1036,7 @@ RENDERERS.final=(v)=>{
   v.appendChild(kpirow(
     kpi('Ciro (teslim edilen)',F.tl(T.ciro),F.mon(PL.meta.minDate)+' →')+
     kpi('SMM',F.tl(T.smm),'Ticimax ×0,80 · YS/Trendyol ×0,65')+
-    kpi('Giderler',F.tl(T.gid),'komisyon + oto masrafı')+
+    kpi('Giderler',F.tl(T.gid),'komisyon + oto + diğer gider')+
     kpi('Kâr / Zarar',F.tl(T.kz), T.kz>=0?'kâr':'zarar', T.kz>=0?'up':'down')
   ));
   const tog=document.createElement('div'); tog.className='fin-enftog';
@@ -1038,13 +1048,26 @@ RENDERERS.final=(v)=>{
   v.appendChild(tog);
   const nt=document.createElement('div'); nt.className='note';
   nt.innerHTML='<b>SMM</b> = ciro × (1 − dilim). Dilim: Ticimax %20 → ×0,80, Yemeksepeti %35 → ×0,65, Trendyol %35 → ×0,65. '+
-    '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b> hücresine yazıp <b>Enter</b> — bu tarayıcıda saklanır. '+
-    '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı)'+(enfDahil?' − (Ciro × Enf. %)':'')+'. '+
+    '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b> ve <b>Diğer gider</b> hücrelerine yazıp <b>Enter</b> — bu tarayıcıda saklanır. '+
+    '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı + Diğer gider)'+(enfDahil?' − (Ciro × Enf. %)':'')+'. '+
     '<b>Enf. %</b> aylık TÜİK TÜFE — [E]/[H] ile kâr/zarara dahil edilip edilmeyeceğini seçin (varsayılan: hayır, yalnız bilgi). '+
     '<span class="fin-open" style="margin-left:2px">ay kapanmadı</span> içinde bulunduğumuz ay için — rakamlar henüz kesinleşmedi.';
   v.appendChild(nt);
   v.appendChild(panel('Pazaryerine göre — aylık kâr / zarar','Satır: pazaryeri × ay (en yeni ay üstte)', finTable(O,'ch','Pazaryeri',enfDahil)));
-  v.appendChild(panel('Mağazaya göre — aylık kâr / zarar','Satır: mağaza × ay (en yeni ay üstte)', finTable(O,'store','Mağaza',enfDahil)));
+
+  // Mağaza × ay — mağaza sayısı fazla olduğundan filtre
+  const storeRows=finRows(O,'store',enfDahil);
+  const storeList=[]; { const seen=new Set(); for(const r of storeRows){ if(!seen.has(r.rv)){ seen.add(r.rv); storeList.push(r.rv); } } }
+  let storeFilter=null;
+  try{ const sv=localStorage.getItem('eta.final.storeSel'); if(sv && storeList.includes(sv)) storeFilter=sv; }catch(e){}
+  const magPanel=panel('Mağazaya göre — aylık kâr / zarar','Satır: mağaza × ay (en yeni ay üstte)', finTable(O,'store','Mağaza',enfDahil,storeFilter));
+  const sel=document.createElement('select'); sel.className='fin-storesel';
+  sel.innerHTML='<option value="">Tümü mağazalar ('+storeList.length+')</option>'+
+    storeList.map(s=>`<option value="${esc(s)}"${s===storeFilter?' selected':''}>${esc(s)}</option>`).join('');
+  sel.onchange=()=>{ try{ sel.value?localStorage.setItem('eta.final.storeSel',sel.value):localStorage.removeItem('eta.final.storeSel'); }catch(e){} render(); };
+  const magSub=magPanel.querySelector('.sub');
+  if(magSub) magSub.after(sel); else magPanel.prepend(sel);
+  v.appendChild(magPanel);
 };
 
 RENDERERS.ciro=(v)=>{

@@ -14,8 +14,14 @@
      TGO_ORDER_PATH   (ops.) uç nokta şablonu, {supplierId} yer tutucusuyla.
                       Verilmezse bilinen kombinasyonlar sırayla denenir.
 
-   NOT: Sipariş API'si komisyonu satır bazında vermez; "Komisyon" / "Satıcı
-   Hakediş" 0 bırakılır (normalize.js net = ciro - komisyon hesaplar).
+   Gerçek komisyon: Sipariş API'si komisyonu vermez ama Trendyol'un "Cari
+   Hesap Ekstresi" (finans/settlements) API'si sipariş bazında gerçek
+   komisyonu veriyor — bkz. fetchCommissions(). Sabit host: apigw.trendyol.com
+   (TGO_API_BASE'den bağımsız), aynı TGO_SELLER_ID / TGO_TOKEN ile çalışıyor
+   (canlı sorguyla doğrulandı — 2026-09).
+     TGO_KOMISYON_DAYS  (ops.) yalnız son N gün için çekilir (varsayılan 60) —
+                        tüm geçmişi her koşuda taramak çok pahalı olur; daha
+                        eski siparişler için: scripts/backfill-tgo-commission.js
    ==========================================================================*/
 'use strict';
 const { pick, log, jget } = require('./_util');
@@ -253,11 +259,81 @@ function toRows(pkgs) {
   return { ty4, ty5 };
 }
 
+/* ---- Gerçek komisyon: Trendyol "Cari Hesap Ekstresi" (finans) API'si ---- */
+const CHE_BASE = 'https://apigw.trendyol.com/integration/finance/che';
+const CHE_WIN = 14 * DAY;   // sorgu başına azami 15 gün — 14 ile güvenli payda kal
+
+/** orderNumber -> toplam commissionAmount (aynı siparişin kalemleri toplanır).
+    [from,to) epoch-ms aralığını 14 günlük pencerelerle, sayfalayarak tarar.
+    Hata/yetkisizlikte sessizce boş Map döner (çağıran Komisyon=0 ile devam eder). */
+async function fetchCommissions({ from, to }) {
+  const c = cfg();
+  if (!c.sellerId || !c.token || !(to > from)) return new Map();
+  const headers = { Authorization: `Basic ${c.token}`, Accept: 'application/json' };
+  const out = new Map();
+  const iso = (t) => new Date(t).toISOString().slice(0, 10);
+  let winEnd = to, guard = 0;
+
+  while (winEnd > from && guard < 500) {
+    const winStart = Math.max(winEnd - CHE_WIN, from);
+    let page = 0, totalPages = 1, winCount = 0;
+    while (page < totalPages && page < 200) {
+      const qs = new URLSearchParams({
+        startDate: String(winStart), endDate: String(winEnd),
+        transactionType: 'Sale', page: String(page), size: '1000'
+      });
+      let body;
+      try {
+        body = await jget(`${CHE_BASE}/sellers/${c.sellerId}/settlements?${qs}`, { headers });
+      } catch (e) {
+        log(id, `⚠ komisyon (finans) [${iso(winStart)}→${iso(winEnd)}] alınamadı: ${e.message}`);
+        break;
+      }
+      const list = Array.isArray(body && body.content) ? body.content : [];
+      totalPages = (body && body.totalPages) || 1;
+      for (const t of list) {
+        const no = String(t.orderNumber || '').trim();
+        if (!no) continue;
+        out.set(no, (out.get(no) || 0) + (Number(t.commissionAmount) || 0));
+      }
+      winCount += list.length;
+      if (!list.length) break;
+      page++;
+    }
+    guard++;
+    log(id, `komisyon penceresi [${iso(winStart)}→${iso(winEnd)}] — +${winCount} kayıt (${out.size} sipariş)`);
+    winEnd = winStart;
+    if (winStart <= from) break;
+  }
+  return out;
+}
+
 async function fetch(opts) {
   const pkgs = await fetchPackages(opts);
   const rows = toRows(pkgs);
   log(id, `${rows.ty4.length} sipariş · ${rows.ty5.length} kalem`);
+
+  // Gerçek komisyonu üzerine yaz — yalnız son TGO_KOMISYON_DAYS gün (varsayılan
+  // 60): tüm geçmişi her koşuda finans API'sinden taramak çok pahalı olur.
+  // Daha eski siparişler Komisyon=0 kalır; tek seferlik doldurma için:
+  // scripts/backfill-tgo-commission.js
+  try {
+    const days = Number(process.env.TGO_KOMISYON_DAYS) || 60;
+    const to = Date.now(), from = to - days * DAY;
+    const kom = await fetchCommissions({ from, to });
+    if (kom.size) {
+      let n = 0;
+      for (const r of rows.ty4) {
+        const v = kom.get(String(r['Sipariş No']));
+        if (v != null) { r['Komisyon'] = Math.round(v * 100) / 100; n++; }
+      }
+      log(id, `komisyon (finans API): ${n}/${rows.ty4.length} siparişe uygulandı (son ${days} gün)`);
+    }
+  } catch (e) {
+    log(id, `⚠ komisyon adımı atlandı: ${e.message}`);
+  }
+
   return rows;
 }
 
-module.exports = { id, configured, fetch };
+module.exports = { id, configured, fetch, fetchCommissions };
