@@ -34,6 +34,12 @@ function manSet(field,dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_manKe
 const normSube = (s) => String(s||'').trim().toLocaleLowerCase('tr-TR');
 /** "Ticimax, Trendyol" -> ['ticimax','trendyol'] (normalize edilmiş, boşlar atılmış). */
 const splitPazaryerleri = (s) => String(s||'').split(',').map(normSube).filter(Boolean);
+/* araclar.sube bazı araçlarda kanonik mağaza adıyla birebir örtüşmüyor
+   (ör. "Alanya Oba" şubesi sipariş verisindeki "Alanya" mağazasına ait) —
+   bilinen istisnalar burada kanonik mağaza adına yönlendirilir. Yeni bir
+   uyumsuzluk görülürse buraya bir satır eklemek yeterli. */
+const SUBE_ALIAS = { 'alanya oba': 'alanya' };
+const resolveSube = (s) => { const n=normSube(s); return SUBE_ALIAS[n] || n; };
 
 let YAKIT_BY_STORE_MON = new Map();   // "normalize(mağaza)|YYYY-MM" -> tutar
 let YAKIT_BY_CH_MON = new Map();      // "normalize(pazaryeri)|YYYY-MM" -> tutar (arac_kaynak'a göre paylaştırılmış)
@@ -47,7 +53,7 @@ let PERS_BY_CH = new Map();           // "normalize(pazaryeri)" -> toplam maaş 
     for(const r of data){
       const mon=String(r.ay).slice(0,7), tutar=+r.tutar||0;
       const sube=r.araclar && r.araclar.sube;
-      if(sube){ const k=normSube(sube)+'|'+mon; YAKIT_BY_STORE_MON.set(k,(YAKIT_BY_STORE_MON.get(k)||0)+tutar); }
+      if(sube){ const k=resolveSube(sube)+'|'+mon; YAKIT_BY_STORE_MON.set(k,(YAKIT_BY_STORE_MON.get(k)||0)+tutar); }
       const pazaryerleri=splitPazaryerleri(r.araclar && r.araclar.arac_kaynak);
       if(pazaryerleri.length){
         const pay=tutar/pazaryerleri.length;
@@ -64,7 +70,7 @@ let PERS_BY_CH = new Map();           // "normalize(pazaryeri)" -> toplam maaş 
     if(error || !data) return;
     for(const a of data){
       const maas=+a.maas||0; if(!maas) continue;
-      if(a.sube){ const k=normSube(a.sube); PERS_BY_STORE.set(k,(PERS_BY_STORE.get(k)||0)+maas); }
+      if(a.sube){ const k=resolveSube(a.sube); PERS_BY_STORE.set(k,(PERS_BY_STORE.get(k)||0)+maas); }
       const pazaryerleri=splitPazaryerleri(a.pers_kaynak);
       if(pazaryerleri.length){
         const pay=maas/pazaryerleri.length;
