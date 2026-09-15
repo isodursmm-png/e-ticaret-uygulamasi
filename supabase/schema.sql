@@ -184,13 +184,15 @@ create policy "read_authenticated"
 --  KÂR / ZARAR EK KAYIT  —  kar_zarar
 --  ----------------------------------------------------------------------------
 --  FİNAL — Kâr/Zarar sayfasının başındaki form. Otomatik hesaba dahil olmayan
---  aylık gider/gelir kalemleri (jeneratör, POS, telefon kasa) burada elle
---  tutulur. Doğrudan tarayıcıdan (anon anahtar + oturum) yazılır/okunur —
---  vehicle_logs/araclar ile aynı yetki modeli.
+--  pazaryeri × ay bazlı gider/gelir kalemleri (jeneratör, POS, telefon kasa)
+--  burada elle tutulur ve Pazaryerine göre kâr/zarar tablosunda o pazaryeri +
+--  ay ile birebir eşleşir. Doğrudan tarayıcıdan (anon anahtar + oturum)
+--  yazılır/okunur — vehicle_logs/araclar ile aynı yetki modeli.
 -- ============================================================================
 create table if not exists public.kar_zarar (
   id              bigint generated always as identity primary key,
   created_at      timestamptz not null default now(),
+  pazaryeri       text,            -- Ticimax | Yemeksepeti | Trendyol
   "yıl"           bigint,
   ay              bigint,
   jen_gideri      numeric,
@@ -198,7 +200,11 @@ create table if not exists public.kar_zarar (
   tel_kasa_gelir  numeric
 );
 
+-- Onceden olusturulmus tablolarda eksikse eklenir (idempotent).
+alter table public.kar_zarar add column if not exists pazaryeri text;
+
 create index if not exists kar_zarar_yil_ay_idx on public.kar_zarar ("yıl", ay);
+create index if not exists kar_zarar_paz_yil_ay_idx on public.kar_zarar (pazaryeri, "yıl", ay);
 
 alter table public.kar_zarar enable row level security;
 
