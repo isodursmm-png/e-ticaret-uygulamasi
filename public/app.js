@@ -548,21 +548,28 @@ function mailBar(panelEl, title){
     `<span class="pmail-msg"></span>`;
   const inp=bar.querySelector('.pmail-in'), btn=bar.querySelector('.pmail-btn'), msg=bar.querySelector('.pmail-msg');
   const setMsg=(t,cls)=>{ msg.textContent=t; msg.className='pmail-msg'+(cls?' '+cls:''); };
+  let preview=null;
   btn.onclick=async()=>{
     const to=(inp.value||'').trim();
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){ setMsg('Geçerli bir e-posta girin','err'); inp.focus(); return; }
     setMsg('Hazırlanıyor…'); btn.disabled=true;
+    if(preview){ preview.remove(); preview=null; }
     try{
       const png=await panelSvgToPng(panelEl);
       const extra=(panelEl.querySelector('.heat-note')||panelEl.querySelector('.sub'));
       const ozet=title+(extra?' — '+extra.textContent.replace(/\s+/g,' ').trim():'')+
         (fullRange()?' · tüm veri':' · '+F.d(S.from)+' – '+F.d(S.to));
       let kopyalandi=false;
-      try{ await copyPngToClipboard(png); kopyalandi=true; }catch(e){ /* pano izni yok/desteklenmiyor — e-posta yine de açılır */ }
+      try{ await copyPngToClipboard(png); kopyalandi=true; }catch(e){ /* pano izni yok/desteklenmiyor — resmi sürükleyerek/indirerek eklemek yine mümkün */ }
       const konu='E-Ticaret Analizleri — '+title;
-      const govde=ozet+(kopyalandi?'\n\n(Grafik panoya kopyalandı — bu e-postaya Ctrl+V ile yapıştırın)':'');
+      const govde=ozet+'\n\n(Grafiği bu e-postaya eklemek için: az önce açılan sayfadaki küçük resmi taslağa sürükleyin, veya indirip ekleyin.)';
       location.href='mailto:'+to+'?subject='+encodeURIComponent(konu)+'&body='+encodeURIComponent(govde);
-      setMsg(kopyalandi?'E-posta açıldı — grafiği Ctrl+V ile yapıştırın':'E-posta açıldı (grafik panoya kopyalanamadı, tarayıcı izni gerekebilir)', kopyalandi?'ok':'err');
+      preview=document.createElement('div'); preview.className='pmail-preview';
+      preview.innerHTML=`<img class="pmail-thumb" src="${png}" draggable="true" alt="grafik" title="Bu resmi sürükleyip e-posta taslağına bırakın">`+
+        `<span class="hint">↑ resmi taslağa sürükleyin</span>`+
+        `<a href="${png}" download="grafik.png">veya indirip ekleyin</a>`;
+      bar.appendChild(preview);
+      setMsg('E-posta açıldı','ok');
     }catch(e){
       setMsg('Grafik hazırlanamadı: '+e.message,'err');
     }finally{ btn.disabled=false; }
