@@ -1153,12 +1153,20 @@ function renderAraclarPanel(v, sb){
       <label>Personel Kaynağı<input type="text" name="pers_kaynak" placeholder="Şirket / Taşeron / ..."></label>
       <label>Maaş<input type="number" step="0.01" min="0" name="maas" placeholder="₺"></label>
       <button type="submit" class="tb-btn act">+ Ekle</button>
-    </form>`);
+    </form>
+    <div class="oto-form" style="margin-top:10px">
+      <label>Yakıt Tutarı — Ay<input type="month" id="aracYakitAy"></label>
+      <button type="button" id="aracYakitAyAll" class="tb-btn">Tümü</button>
+    </div>`);
   const listHost=document.createElement('div'); listHost.id='aracList'; listHost.textContent='Yükleniyor…';
   panelEl.appendChild(listHost);
   v.appendChild(panelEl);
 
   let editingId=null;
+  let yakitAy=null;   // null = tüm aylar toplamı; "YYYY-MM" = yalnız o ay
+  const yakitAyInput=panelEl.querySelector('#aracYakitAy');
+  yakitAyInput.onchange=()=>{ yakitAy=yakitAyInput.value||null; refresh(); };
+  panelEl.querySelector('#aracYakitAyAll').onclick=()=>{ yakitAy=null; yakitAyInput.value=''; refresh(); };
 
   function viewRow(r){
     return `<tr data-id="${r.id}">`+
@@ -1190,8 +1198,9 @@ function renderAraclarPanel(v, sb){
   }
   function renderList(rows){
     if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz araç kaydı yok</div>'; return; }
+    const yakitTh=yakitAy?`Yakıt Tutarı (${esc(F.mon(yakitAy))})`:'Yakıt Tutarı (Tümü)';
     let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
-      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th>Kaynak</th><th>Araç Kaynağı</th><th>Personel Kaynağı</th><th>Maaş</th><th>Yakıt Tutarı</th><th></th></tr></thead><tbody>`;
+      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th>Kaynak</th><th>Araç Kaynağı</th><th>Personel Kaynağı</th><th>Maaş</th><th>${yakitTh}</th><th></th></tr></thead><tbody>`;
     rows.forEach(r=>{ h+= (String(r.id)===String(editingId)) ? editRow(r) : viewRow(r); });
     h+='</tbody></table></div>';
     listHost.innerHTML=h;
@@ -1223,9 +1232,11 @@ function renderAraclarPanel(v, sb){
   }
   async function refresh(){
     listHost.textContent='Yükleniyor…';
+    let yakitQ=sb.from('yakitlar').select('arac_id,tutar');
+    if(yakitAy) yakitQ=yakitQ.eq('ay', yakitAy+'-01');
     const [aracRes, yakitRes]=await Promise.all([
       sb.from('araclar').select('*').order('plaka',{ascending:true}),
-      sb.from('yakitlar').select('arac_id,tutar')
+      yakitQ
     ]);
     if(aracRes.error){ listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(aracRes.error.message)+'</div>'; return; }
     const yakitByArac={};
