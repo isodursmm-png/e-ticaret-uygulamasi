@@ -1140,7 +1140,7 @@ RENDERERS.final=(v)=>{
 /* ============ E-TİCARET OTOLARI — araçlar + Petrol Ofisi yakıt alımları (canlı Supabase) ============ */
 /* ---- Araçlar: filo listesi (plaka/şube/şoför/kullanım) — public.araclar ---- */
 function renderAraclarPanel(v, sb){
-  const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, kullanım amacı, kaynak, maaş');
+  const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, kullanım amacı, kaynak, araç/personel kaynağı, maaş, yakıt tutarı');
   panelEl.insertAdjacentHTML('beforeend', `
     <form id="aracForm" class="oto-form">
       <label>Plaka<input type="text" name="plaka" placeholder="07 AB 1234" required style="text-transform:uppercase"></label>
@@ -1149,6 +1149,8 @@ function renderAraclarPanel(v, sb){
       <label>Şoför<input type="text" name="sofor" placeholder="Ad Soyad"></label>
       <label>Kullanım<input type="text" name="kullanim" placeholder="Dağıtım / Servis / ..."></label>
       <label>Kaynak<input type="text" name="source" placeholder="ticimax"></label>
+      <label>Araç Kaynağı<input type="text" name="arac_kaynak" placeholder="Kiralık / Şirket / ..."></label>
+      <label>Personel Kaynağı<input type="text" name="pers_kaynak" placeholder="Şirket / Taşeron / ..."></label>
       <label>Maaş<input type="number" step="0.01" min="0" name="maas" placeholder="₺"></label>
       <button type="submit" class="tb-btn act">+ Ekle</button>
     </form>`);
@@ -1162,7 +1164,9 @@ function renderAraclarPanel(v, sb){
     return `<tr data-id="${r.id}">`+
       `<td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td><td>${esc(r.sofor||'')}</td>`+
       `<td>${esc(r.kullanim||'')}</td><td>${esc(r.source||'')}</td>`+
+      `<td>${esc(r.arac_kaynak||'')}</td><td>${esc(r.pers_kaynak||'')}</td>`+
       `<td class="num">${r.maas!=null?esc(F.tl(r.maas)):'—'}</td>`+
+      `<td class="num">${esc(F.tl(r.yakit||0))}</td>`+
       `<td class="num">`+
       `<button type="button" class="oto-edit tb-btn" data-id="${r.id}" title="Düzenle">✎</button> `+
       `<button type="button" class="oto-del" data-id="${r.id}" title="Sil">✕</button>`+
@@ -1175,7 +1179,10 @@ function renderAraclarPanel(v, sb){
       `<td><input type="text" class="ar-sofor" value="${esc(r.sofor||'')}"></td>`+
       `<td><input type="text" class="ar-kullanim" value="${esc(r.kullanim||'')}"></td>`+
       `<td><input type="text" class="ar-source" value="${esc(r.source||'')}"></td>`+
+      `<td><input type="text" class="ar-arac-kaynak" value="${esc(r.arac_kaynak||'')}"></td>`+
+      `<td><input type="text" class="ar-pers-kaynak" value="${esc(r.pers_kaynak||'')}"></td>`+
       `<td class="num"><input type="number" step="0.01" min="0" class="ar-maas" value="${r.maas!=null?r.maas:''}"></td>`+
+      `<td class="num">${esc(F.tl(r.yakit||0))}</td>`+
       `<td class="num">`+
       `<button type="button" class="oto-save tb-btn act" data-id="${r.id}" title="Kaydet">✓</button> `+
       `<button type="button" class="oto-cancel tb-btn" data-id="${r.id}" title="Vazgeç">✕</button>`+
@@ -1184,7 +1191,7 @@ function renderAraclarPanel(v, sb){
   function renderList(rows){
     if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz araç kaydı yok</div>'; return; }
     let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
-      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th>Kaynak</th><th>Maaş</th><th></th></tr></thead><tbody>`;
+      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th>Kaynak</th><th>Araç Kaynağı</th><th>Personel Kaynağı</th><th>Maaş</th><th>Yakıt Tutarı</th><th></th></tr></thead><tbody>`;
     rows.forEach(r=>{ h+= (String(r.id)===String(editingId)) ? editRow(r) : viewRow(r); });
     h+='</tbody></table></div>';
     listHost.innerHTML=h;
@@ -1205,7 +1212,8 @@ function renderAraclarPanel(v, sb){
       if(!plaka){ alert('Plaka gerekli.'); return; }
       const maasRaw=tr.querySelector('.ar-maas').value;
       const row={ plaka, sube:val('ar-sube'), sofor:val('ar-sofor'), kullanim:val('ar-kullanim'),
-        source:val('ar-source'), maas: maasRaw===''?null:Number(maasRaw) };
+        source:val('ar-source'), arac_kaynak:val('ar-arac-kaynak'), pers_kaynak:val('ar-pers-kaynak'),
+        maas: maasRaw===''?null:Number(maasRaw) };
       b.disabled=true;
       const { error }=await sb.from('araclar').update(row).eq('id', b.dataset.id);
       if(error){ alert('Kaydedilemedi: '+error.message); b.disabled=false; return; }
@@ -1215,10 +1223,16 @@ function renderAraclarPanel(v, sb){
   }
   async function refresh(){
     listHost.textContent='Yükleniyor…';
-    const { data, error }=await sb.from('araclar').select('*').order('plaka',{ascending:true});
-    if(error){ listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(error.message)+'</div>'; return; }
-    renderList(data||[]);
-    return data||[];
+    const [aracRes, yakitRes]=await Promise.all([
+      sb.from('araclar').select('*').order('plaka',{ascending:true}),
+      sb.from('yakitlar').select('arac_id,tutar')
+    ]);
+    if(aracRes.error){ listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(aracRes.error.message)+'</div>'; return; }
+    const yakitByArac={};
+    (yakitRes.data||[]).forEach(r=>{ yakitByArac[r.arac_id]=(yakitByArac[r.arac_id]||0)+(+r.tutar||0); });
+    const rows=(aracRes.data||[]).map(r=>({ ...r, yakit:yakitByArac[r.id]||0 }));
+    renderList(rows);
+    return rows;
   }
   panelEl.querySelector('#aracForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
@@ -1228,7 +1242,8 @@ function renderAraclarPanel(v, sb){
     if(!plaka){ alert('Plaka gerekli.'); return; }
     const maasRaw=f.elements.maas.value;
     const row={ plaka, sube:val('sube'), sofor:val('sofor'), kullanim:val('kullanim'),
-      source:val('source'), maas: maasRaw===''?null:Number(maasRaw) };
+      source:val('source'), arac_kaynak:val('arac_kaynak'), pers_kaynak:val('pers_kaynak'),
+      maas: maasRaw===''?null:Number(maasRaw) };
     const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
     const { error }=await sb.from('araclar').insert(row);
     btn.disabled=false;
@@ -1239,79 +1254,10 @@ function renderAraclarPanel(v, sb){
   refresh();
 }
 
-/* ---- Yakıt Alımları: public.yakitlar (Petrol Ofisi'nden api/yakit-sync.js'in günlük yazdığı kayıt) ---- */
-const AY_ADLARI=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-function renderYakitPanel(v, sb){
-  const now=new Date();
-  const curMonthVal=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-
-  const panelEl=panel('Yakıt Alımları','Kayıtlı aylık özet (Petrol Ofisi, her gün otomatik güncellenir) — yalnızca Araçlar listesindeki plakalar');
-  panelEl.insertAdjacentHTML('beforeend', `
-    <form id="yakitForm" class="oto-form yakit-form-inline">
-      <label>Ay<input type="month" name="ay" value="${curMonthVal}" required></label>
-      <button type="submit" class="tb-btn act">⛽ Çek</button>
-    </form>`);
-  const monthLabel=document.createElement('div'); monthLabel.className='sub'; monthLabel.style.marginTop='10px';
-  panelEl.appendChild(monthLabel);
-  const kpiRow=document.createElement('div'); kpiRow.className='kpirow'; kpiRow.style.marginTop='6px';
-  panelEl.appendChild(kpiRow);
-  const listHost=document.createElement('div'); listHost.id='yakitList';
-  panelEl.appendChild(listHost);
-  v.appendChild(panelEl);
-
-  function renderKpi(byPlate, etiket){
-    const litre=byPlate.reduce((a,r)=>a+(+r.litre||0),0);
-    const tutar=byPlate.reduce((a,r)=>a+(+r.tutar||0),0);
-    const islem=byPlate.reduce((a,r)=>a+(+r.islem||0),0);
-    const aracSayisi=byPlate.filter(r=>r.islem>0).length;
-    monthLabel.textContent=etiket;
-    kpiRow.innerHTML=kpi('Alım yapan araç',F.n(aracSayisi)+' / '+F.n(byPlate.length))+
-      kpi('Toplam yakıt',F.n1(litre)+' L')+kpi('Toplam tutar',F.tl(tutar))+kpi('İşlem sayısı',F.n(islem));
-  }
-  function renderList(byPlate){
-    if(!byPlate.length){ listHost.innerHTML='<div class="miss">Bu ay için henüz kayıt yok — otomatik senkronizasyon her gün çalışır.</div>'; return; }
-    let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
-      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Litre</th><th>Tutar</th><th>İşlem</th></tr></thead><tbody>`;
-    byPlate.forEach(r=>{
-      h+=`<tr><td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td><td>${esc(r.sofor||'')}</td>`+
-        `<td class="num">${F.n1(r.litre)} L</td><td class="num">${F.tl(r.tutar)}</td><td class="num">${F.n(r.islem)}</td></tr>`;
-    });
-    h+='</tbody></table></div>';
-    listHost.innerHTML=h;
-  }
-  panelEl.querySelector('#yakitForm').addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const f=e.target;
-    const monthVal=f.elements.ay.value;
-    const [y,m]=monthVal.split('-').map(Number);
-    const ayFirst=`${monthVal}-01`;
-    const etiket=`${AY_ADLARI[m-1]} ${y}`;
-    const btn=f.querySelector('button[type=submit]');
-    kpiRow.innerHTML=''; listHost.innerHTML=''; monthLabel.textContent=''; btn.disabled=true;
-    try{
-      const { data, error }=await sb.from('yakitlar')
-        .select('litre,tutar,islem,araclar(plaka,sube,sofor,kullanim)')
-        .eq('ay', ayFirst);
-      if(error) throw error;
-      const byPlate=(data||[]).map(r=>({
-        plaka:r.araclar&&r.araclar.plaka, sube:r.araclar&&r.araclar.sube,
-        sofor:r.araclar&&r.araclar.sofor, kullanim:r.araclar&&r.araclar.kullanim,
-        litre:r.litre, tutar:r.tutar, islem:r.islem
-      })).sort((a,b)=>b.tutar-a.tutar);
-      renderKpi(byPlate, etiket); renderList(byPlate);
-    }catch(err){
-      listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(err.message||err)+'</div>';
-    }finally{
-      btn.disabled=false;
-    }
-  });
-}
-
 RENDERERS.otolar=(v)=>{
   const sb=window.__SB__;
   if(!sb){ const m=document.createElement('div'); m.className='miss'; m.textContent='Supabase bağlantısı yok.'; v.appendChild(m); return; }
 
-  renderYakitPanel(v, sb);
   renderAraclarPanel(v, sb);
 };
 
