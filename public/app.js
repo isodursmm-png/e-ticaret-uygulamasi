@@ -20,29 +20,24 @@ const TUFE = (window.__TUFE__ && window.__TUFE__.monthly) || {};
 const _manKey = (field,dim,row,mon) => `eta.final.${field}.${dim}.${row}.${mon}`;
 function manGet(field,dim,row,mon){ try{ return +localStorage.getItem(_manKey(field,dim,row,mon))||0; }catch(e){ return 0; } }
 function manSet(field,dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_manKey(field,dim,row,mon),String(val)) : localStorage.removeItem(_manKey(field,dim,row,mon)); }catch(e){} }
-/* Oto masrafı — public.yakitlar'dan otomatik: mağaza×ay araclar.sube eşleşmesiyle,
-   pazaryeri×ay araclar.source eşleşmesiyle (ör. source="ticimax" -> "Ticimax"
-   satırı) dolduruluyor. Senkron verisi olan hücreler salt-okunur olur; olmayan
-   (ör. source boş/tanınmayan, ya da 2026 öncesi) hücrelerde elle giriş eskisi
-   gibi çalışmaya devam eder. */
-/* araclar.sube/source elle girildiği için büyük/küçük harf ve Türkçe karakter
-   farkı olabilir (ör. "ERCİYES" vs kanonik "Erciyes") — eşleştirmeyi harf
-   duyarsız (tr-TR) yapıyoruz, yoksa çoğu satır sessizce eşleşmez. */
+/* Oto masrafı — public.yakitlar'dan otomatik: mağaza×ay araclar.sube eşleşmesiyle
+   dolduruluyor. Senkron verisi olan hücreler salt-okunur olur; olmayan hücrelerde
+   elle giriş eskisi gibi çalışmaya devam eder. */
+/* araclar.sube elle girildiği için büyük/küçük harf ve Türkçe karakter farkı
+   olabilir (ör. "ERCİYES" vs kanonik "Erciyes") — eşleştirmeyi harf duyarsız
+   (tr-TR) yapıyoruz, yoksa çoğu satır sessizce eşleşmez. */
 const normSube = (s) => String(s||'').trim().toLocaleLowerCase('tr-TR');
 let YAKIT_BY_STORE_MON = new Map();   // "normalize(mağaza)|YYYY-MM" -> tutar
-let YAKIT_BY_CH_MON = new Map();      // "normalize(pazaryeri)|YYYY-MM" -> tutar
 let MAAS_BY_STORE = new Map();        // "normalize(mağaza)" -> toplam maaş (her ay aynı, sabit gider)
 (async function loadYakitTotals(){
   const sb = window.__SB__; if(!sb) return;
   try{
-    const { data, error } = await sb.from('yakitlar').select('ay,tutar,araclar(sube,source)');
+    const { data, error } = await sb.from('yakitlar').select('ay,tutar,araclar(sube)');
     if(error || !data) return;
     for(const r of data){
       const mon=String(r.ay).slice(0,7), tutar=+r.tutar||0;
       const sube=r.araclar && r.araclar.sube;
       if(sube){ const k=normSube(sube)+'|'+mon; YAKIT_BY_STORE_MON.set(k,(YAKIT_BY_STORE_MON.get(k)||0)+tutar); }
-      const source=r.araclar && r.araclar.source;
-      if(source){ const k=normSube(source)+'|'+mon; YAKIT_BY_CH_MON.set(k,(YAKIT_BY_CH_MON.get(k)||0)+tutar); }
     }
     render();
   }catch(e){ /* sessiz geç — Oto masrafı elle girilmiş haliyle kalır */ }
@@ -60,7 +55,6 @@ let MAAS_BY_STORE = new Map();        // "normalize(mağaza)" -> toplam maaş (h
 })();
 function otoAutoVal(dim,row,mon){
   if(dim==='store'){ const k=normSube(row)+'|'+mon; if(YAKIT_BY_STORE_MON.has(k)) return YAKIT_BY_STORE_MON.get(k); }
-  if(dim==='ch'){ const k=normSube(row)+'|'+mon; if(YAKIT_BY_CH_MON.has(k)) return YAKIT_BY_CH_MON.get(k); }
   return null;
 }
 const otoGet=(dim,row,mon)=>{ const a=otoAutoVal(dim,row,mon); return a!=null ? a : manGet('oto',dim,row,mon); };
@@ -1140,7 +1134,7 @@ RENDERERS.final=(v)=>{
 /* ============ E-TİCARET OTOLARI — araçlar + Petrol Ofisi yakıt alımları (canlı Supabase) ============ */
 /* ---- Araçlar: filo listesi (plaka/şube/şoför/kullanım) — public.araclar ---- */
 function renderAraclarPanel(v, sb){
-  const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, kullanım amacı, kaynak, araç/personel kaynağı, maaş, yakıt tutarı');
+  const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, kullanım amacı, araç/personel kaynağı, maaş, yakıt tutarı');
   panelEl.insertAdjacentHTML('beforeend', `
     <form id="aracForm" class="oto-form">
       <label>Plaka<input type="text" name="plaka" placeholder="07 AB 1234" required style="text-transform:uppercase"></label>
@@ -1148,7 +1142,6 @@ function renderAraclarPanel(v, sb){
       <datalist id="aracSubeList">${DIMS.store.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
       <label>Şoför<input type="text" name="sofor" placeholder="Ad Soyad"></label>
       <label>Kullanım<input type="text" name="kullanim" placeholder="Dağıtım / Servis / ..."></label>
-      <label>Kaynak<input type="text" name="source" placeholder="ticimax"></label>
       <label>Araç Kaynağı<input type="text" name="arac_kaynak" placeholder="Kiralık / Şirket / ..."></label>
       <label>Personel Kaynağı<input type="text" name="pers_kaynak" placeholder="Şirket / Taşeron / ..."></label>
       <label>Maaş<input type="number" step="0.01" min="0" name="maas" placeholder="₺"></label>
@@ -1171,7 +1164,7 @@ function renderAraclarPanel(v, sb){
   function viewRow(r){
     return `<tr data-id="${r.id}">`+
       `<td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td><td>${esc(r.sofor||'')}</td>`+
-      `<td>${esc(r.kullanim||'')}</td><td>${esc(r.source||'')}</td>`+
+      `<td>${esc(r.kullanim||'')}</td>`+
       `<td>${esc(r.arac_kaynak||'')}</td><td>${esc(r.pers_kaynak||'')}</td>`+
       `<td class="num">${r.maas!=null?esc(F.tl(r.maas)):'—'}</td>`+
       `<td class="num">${esc(F.tl(r.yakit||0))}</td>`+
@@ -1186,7 +1179,6 @@ function renderAraclarPanel(v, sb){
       `<td><input type="text" class="ar-sube" list="aracSubeList" value="${esc(r.sube||'')}"></td>`+
       `<td><input type="text" class="ar-sofor" value="${esc(r.sofor||'')}"></td>`+
       `<td><input type="text" class="ar-kullanim" value="${esc(r.kullanim||'')}"></td>`+
-      `<td><input type="text" class="ar-source" value="${esc(r.source||'')}"></td>`+
       `<td><input type="text" class="ar-arac-kaynak" value="${esc(r.arac_kaynak||'')}"></td>`+
       `<td><input type="text" class="ar-pers-kaynak" value="${esc(r.pers_kaynak||'')}"></td>`+
       `<td class="num"><input type="number" step="0.01" min="0" class="ar-maas" value="${r.maas!=null?r.maas:''}"></td>`+
@@ -1200,7 +1192,7 @@ function renderAraclarPanel(v, sb){
     if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz araç kaydı yok</div>'; return; }
     const yakitTh=yakitAy?`Yakıt Tutarı (${esc(F.mon(yakitAy))})`:'Yakıt Tutarı (Tümü)';
     let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
-      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th>Kaynak</th><th>Araç Kaynağı</th><th>Personel Kaynağı</th><th>Maaş</th><th>${yakitTh}</th><th></th></tr></thead><tbody>`;
+      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th>Araç Kaynağı</th><th>Personel Kaynağı</th><th>Maaş</th><th>${yakitTh}</th><th></th></tr></thead><tbody>`;
     rows.forEach(r=>{ h+= (String(r.id)===String(editingId)) ? editRow(r) : viewRow(r); });
     h+='</tbody></table></div>';
     listHost.innerHTML=h;
@@ -1221,7 +1213,7 @@ function renderAraclarPanel(v, sb){
       if(!plaka){ alert('Plaka gerekli.'); return; }
       const maasRaw=tr.querySelector('.ar-maas').value;
       const row={ plaka, sube:val('ar-sube'), sofor:val('ar-sofor'), kullanim:val('ar-kullanim'),
-        source:val('ar-source'), arac_kaynak:val('ar-arac-kaynak'), pers_kaynak:val('ar-pers-kaynak'),
+        arac_kaynak:val('ar-arac-kaynak'), pers_kaynak:val('ar-pers-kaynak'),
         maas: maasRaw===''?null:Number(maasRaw) };
       b.disabled=true;
       const { error }=await sb.from('araclar').update(row).eq('id', b.dataset.id);
@@ -1253,7 +1245,7 @@ function renderAraclarPanel(v, sb){
     if(!plaka){ alert('Plaka gerekli.'); return; }
     const maasRaw=f.elements.maas.value;
     const row={ plaka, sube:val('sube'), sofor:val('sofor'), kullanim:val('kullanim'),
-      source:val('source'), arac_kaynak:val('arac_kaynak'), pers_kaynak:val('pers_kaynak'),
+      arac_kaynak:val('arac_kaynak'), pers_kaynak:val('pers_kaynak'),
       maas: maasRaw===''?null:Number(maasRaw) };
     const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
     const { error }=await sb.from('araclar').insert(row);
