@@ -136,8 +136,14 @@ function mix(a,b,t){ const p=x=>{x=x.replace('#','').trim();return x.length===3?
   const A=p(a),B=p(b); return 'rgb('+A.map((v,i)=>Math.round(v+(B[i]-v)*t)).join(',')+')'; }
 
 /* ---------- durum ---------- */
+const _clampD = s => s<PL.meta.minDate ? PL.meta.minDate : (s>PL.meta.maxDate ? PL.meta.maxDate : s);
+/* Açılışta varsayılan dönem: 2026 yılı (veri o yılı kapsıyorsa), yoksa tüm veri */
+const DEF_YEAR = '2026';
+const _defRange = (PL.meta.maxDate>=DEF_YEAR+'-01-01' && PL.meta.minDate<=DEF_YEAR+'-12-31')
+  ? { from:_clampD(DEF_YEAR+'-01-01'), to:_clampD(DEF_YEAR+'-12-31') }
+  : { from:PL.meta.minDate, to:PL.meta.maxDate };
 const S = {
-  ch:new Set(CH), from:PL.meta.minDate, to:PL.meta.maxDate,
+  ch:new Set(CH), from:_defRange.from, to:_defRange.to,
   city:new Set(), ilce:new Set(), store:new Set(), st:new Set(), src:new Set(), pay:new Set(), q:''
 };
 const uniqSort = (arr) => [...new Set(arr.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'tr'));
@@ -152,7 +158,6 @@ const DIMS = {
 const fullRange = () => S.from===PL.meta.minDate && S.to===PL.meta.maxDate;
 const _addDays = (s,n) => { const d=new Date(s+'T00:00:00'); d.setDate(d.getDate()+n);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
-const _clampD = s => s<PL.meta.minDate ? PL.meta.minDate : (s>PL.meta.maxDate ? PL.meta.maxDate : s);
 const _lastDom = ym => { const [y,m]=ym.split('-').map(Number); return ym+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0'); };
 
 function fO(){
@@ -316,7 +321,10 @@ function barV(cats, series, {fmt=F.n, stacked=true, catFmt=(x=>x), note=null, va
 
 function lineC(cats, series, {fmt=F.n, catFmt=(x=>x), area=false}={}){
   if(!cats.length) return miss();
-  const W=780, H=290, padL=64, padR=16, padT=16, padB=38;
+  const dayLike0 = cats.length>0 && /^\d{4}-\d{2}-\d{2}$/.test(String(cats[0]));
+  const monthMode0 = dayLike0 && cats.length>24;
+  const vertLabels = monthMode0 && series.length===1;   // değer etiketleri dik (yukarı doğru) yazılacak mı
+  const W=780, H=290, padL=64, padR=20, padT=vertLabels?92:16, padB=38;
   const iw=W-padL-padR, ih=H-padT-padB;
   const max=Math.max(...series.flatMap(se=>se.values),1)*1.08;
   const xAt=i=>padL+(cats.length===1?iw/2:iw*i/(cats.length-1));
@@ -326,8 +334,7 @@ function lineC(cats, series, {fmt=F.n, catFmt=(x=>x), area=false}={}){
     s+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="${PAL['--hair']}"/>`;
     s+=`<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="${PAL['--ink-2']}">${esc(fmt(v))}</text>`; }
   // x ekseni: çok sayıda gün varsa yalnızca ay başlarını "Ay YYYY" olarak etiketle
-  const dayLike = cats.length>0 && /^\d{4}-\d{2}-\d{2}$/.test(String(cats[0]));
-  const monthMode = dayLike && cats.length>24;
+  const monthMode = monthMode0;
   const tickIdx = monthMode
     ? cats.map((c,i)=> (i===0 || String(c).slice(0,7)!==String(cats[i-1]).slice(0,7)) ? i : -1).filter(i=>i>=0)
     : cats.map((_,i)=>i);
@@ -341,19 +348,23 @@ function lineC(cats, series, {fmt=F.n, catFmt=(x=>x), area=false}={}){
     s+=`<path d="M${pts.map(p=>p.join(',')).join(' L')}" fill="none" stroke="${se.color}" stroke-width="2.2" stroke-linejoin="round"/>`;
     const last=pts[pts.length-1];
     s+=`<circle cx="${last[0]}" cy="${last[1]}" r="4" fill="${se.color}" stroke="${PAL['--surface']}" stroke-width="1.5"/>`;
-    s+=`<text x="${last[0]-9}" y="${last[1]-11}" text-anchor="end" font-size="11" font-weight="700" fill="${se.color}" paint-order="stroke" stroke="${PAL['--page']}" stroke-width="3.5">${esc(fmt(se.values[se.values.length-1]))}</text>`;
+    if(vertLabels){
+      const lx=last[0], ly=Math.max(padT+2, last[1]-10);
+      s+=`<text x="${lx}" y="${ly}" text-anchor="start" transform="rotate(-90 ${lx} ${ly})" font-size="11" font-weight="700" fill="${se.color}" paint-order="stroke" stroke="${PAL['--page']}" stroke-width="3.5">${esc(fmt(se.values[se.values.length-1]))}</text>`;
+    } else {
+      s+=`<text x="${last[0]-9}" y="${last[1]-11}" text-anchor="end" font-size="11" font-weight="700" fill="${se.color}" paint-order="stroke" stroke="${PAL['--page']}" stroke-width="3.5">${esc(fmt(se.values[se.values.length-1]))}</text>`;
+    }
   });
-  // ay başlarındaki gerçek (kısaltmasız) kümülatif değer — çizgiden ayrı, ok/kılavuz çizgisiyle
-  if(monthMode && series.length===1){
+  // ay başlarındaki gerçek (kısaltmasız) kümülatif değer — noktanın hemen üstünden başlayıp yukarı doğru dik yazılır
+  if(vertLabels){
     const se=series[0];
     tickIdx.forEach(i=>{
       if(i===0 || i > cats.length-8) return;                // 0 ve grafik sonu (uç etiket) hariç
       const v=se.values[i]; if(!(v>0)) return;
       const x=xAt(i), y=yAt(v);
-      const ly=Math.max(padT+11, y-28);                     // etiket noktayı ~28px üstünde
-      s+=`<line x1="${x}" y1="${y-3}" x2="${x}" y2="${ly+3}" stroke="${se.color}" stroke-width="1.2" opacity=".65"/>`;
+      const ly=Math.max(padT+2, y-10);
       s+=`<circle cx="${x}" cy="${y}" r="3" fill="${se.color}" stroke="${PAL['--surface']}" stroke-width="1"/>`;
-      s+=`<text x="${x}" y="${ly}" text-anchor="middle" font-size="10.5" font-weight="700" fill="${se.color}" paint-order="stroke" stroke="${PAL['--page']}" stroke-width="3.5">${esc(fmt(v))}</text>`;
+      s+=`<text x="${x}" y="${ly}" text-anchor="start" transform="rotate(-90 ${x} ${ly})" font-size="10.5" font-weight="700" fill="${se.color}" paint-order="stroke" stroke="${PAL['--page']}" stroke-width="3.5">${esc(fmt(v))}</text>`;
     });
   }
   s+=`<line id="xh" x1="0" x2="0" y1="${padT}" y2="${padT+ih}" stroke="${PAL['--hair-strong']}" opacity="0"/>`;
@@ -1236,7 +1247,7 @@ function renderYakitPanel(v, sb){
 
   const panelEl=panel('Yakıt Alımları','Kayıtlı aylık özet (Petrol Ofisi, her gün otomatik güncellenir) — yalnızca Araçlar listesindeki plakalar');
   panelEl.insertAdjacentHTML('beforeend', `
-    <form id="yakitForm" class="oto-form">
+    <form id="yakitForm" class="oto-form yakit-form-inline">
       <label>Ay<input type="month" name="ay" value="${curMonthVal}" required></label>
       <button type="submit" class="tb-btn act">⛽ Çek</button>
     </form>`);

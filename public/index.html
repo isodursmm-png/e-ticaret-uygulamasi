@@ -245,7 +245,7 @@ button{font:inherit; cursor:pointer}
 .tbl-scroll-top::-webkit-scrollbar-thumb{background:var(--panel-h); border-radius:6px}
 .tbl-scroll-top::-webkit-scrollbar-track{background:var(--surface-2)}
 table.dt{border-collapse:collapse; width:100%; font-size:12.5px}
-table.dt th,table.dt td{padding:7px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--hair)}
+table.dt th,table.dt td{padding:7px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--hair-strong)}
 table.dt th:first-child,table.dt td:first-child{text-align:left; position:sticky; left:0; background:var(--panel)}
 table.dt thead th{position:sticky; top:0; z-index:3;
   font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:#fff; font-weight:700;
@@ -259,6 +259,7 @@ table.dt tfoot td{font-weight:700; border-top:2px solid var(--hair-strong); bord
 /* FİNAL tablosu */
 table.dt.fin tr.fin-grp td{border-top:2px solid var(--hair-strong)}
 table.dt.fin tr.fin-grp td:first-child{font-weight:700; color:var(--ink)}
+table.dt.fin tbody tr td{border-bottom:1px solid color-mix(in srgb, var(--ink-2) 30%, transparent)}
 input.fin-oto{width:92px; text-align:right; font:inherit; font-variant-numeric:tabular-nums;
   border:1px solid var(--hair-strong); border-radius:6px; padding:3px 6px; background:var(--surface); color:var(--ink)}
 input.fin-oto:focus{outline:none; border-color:var(--good); box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 30%,transparent)}
@@ -280,10 +281,14 @@ input.fin-oto:focus{outline:none; border-color:var(--good); box-shadow:0 0 0 3px
 /* E-Ticaret Otoları */
 .oto-form{display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end}
 .oto-form label{display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:600; color:var(--ink-2); min-width:130px}
+.yakit-form-inline{align-items:center}
+.yakit-form-inline label{flex-direction:row; align-items:center; gap:8px; min-width:0; white-space:nowrap}
 .oto-form input{font:inherit; font-size:13px; font-weight:500; color:var(--ink); background:var(--surface);
   border:1px solid var(--hair-strong); border-radius:8px; padding:7px 10px}
 .oto-form input:focus{outline:none; border-color:var(--s8); box-shadow:0 0 0 3px color-mix(in srgb,var(--s8) 25%,transparent)}
 .oto-form button{align-self:flex-end; background:var(--s8); border-color:var(--s8); color:#fff}
+th.oto-vurgu,td.oto-vurgu{color:#f97316; font-weight:700}
+th.oto-vurgu{background:color-mix(in srgb, #f97316 16%, transparent)}
 button.oto-del{border:1px solid var(--hair-strong); background:var(--surface); color:var(--muted);
   border-radius:6px; padding:2px 8px; font-size:12px; cursor:pointer}
 button.oto-del:hover{color:var(--crit); border-color:var(--crit)}
