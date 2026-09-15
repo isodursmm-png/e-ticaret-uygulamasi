@@ -1124,7 +1124,101 @@ function finTable(O, dim, label, enfDahil, storeFilter){
   });
   return w;
 }
+/* ---- Kâr/Zarar ek kayıt: jeneratör gideri, POS gideri, tel kasa geliri — public.kar_zarar (canlı Supabase) ---- */
+function renderKarZararForm(v, sb){
+  const panelEl=panel('Kâr / Zarar — Ek Kayıt','Jeneratör gideri, POS gideri, telefon kasa geliri — aylık elle kayıt (public.kar_zarar)');
+  const curYear=+CURMON.slice(0,4), curMonth=+CURMON.slice(5,7);
+  const AY_TAM={1:'Ocak',2:'Şubat',3:'Mart',4:'Nisan',5:'Mayıs',6:'Haziran',7:'Temmuz',8:'Ağustos',9:'Eylül',10:'Ekim',11:'Kasım',12:'Aralık'};
+  panelEl.insertAdjacentHTML('beforeend', `
+    <form id="kzForm" class="oto-form">
+      <label>Yıl<input type="number" name="yil" min="2000" max="2100" value="${curYear}" required></label>
+      <label>Ay<select name="ay" required>${range(1,12).map(m=>`<option value="${m}"${m===curMonth?' selected':''}>${esc(AY_TAM[m])}</option>`).join('')}</select></label>
+      <label>Jeneratör Gideri<input type="number" step="0.01" min="0" name="jen_gideri" placeholder="₺"></label>
+      <label>POS Gideri<input type="number" step="0.01" min="0" name="pos_gider" placeholder="₺"></label>
+      <label>Tel Kasa Geliri<input type="number" step="0.01" min="0" name="tel_kasa_gelir" placeholder="₺"></label>
+      <button type="submit" class="tb-btn act">+ Ekle</button>
+    </form>`);
+  const listHost=document.createElement('div'); listHost.id='kzList'; listHost.style.marginTop='12px'; listHost.textContent='Yükleniyor…';
+  panelEl.appendChild(listHost);
+  v.appendChild(panelEl);
+
+  let editingId=null;
+  const monLbl=r=>esc(F.mon(r['yıl']+'-'+String(r.ay).padStart(2,'0')));
+  function viewRow(r){
+    return `<tr data-id="${r.id}">`+
+      `<td>${monLbl(r)}</td>`+
+      `<td class="num">${r.jen_gideri!=null?esc(F.tl(r.jen_gideri)):'—'}</td>`+
+      `<td class="num">${r.pos_gider!=null?esc(F.tl(r.pos_gider)):'—'}</td>`+
+      `<td class="num">${r.tel_kasa_gelir!=null?esc(F.tl(r.tel_kasa_gelir)):'—'}</td>`+
+      `<td class="num">`+
+      `<button type="button" class="oto-edit tb-btn" data-id="${r.id}" title="Düzenle">✎</button> `+
+      `<button type="button" class="oto-del" data-id="${r.id}" title="Sil">✕</button>`+
+      `</td></tr>`;
+  }
+  function editRow(r){
+    return `<tr data-id="${r.id}" class="oto-editrow">`+
+      `<td>${monLbl(r)}</td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="kz-jen" value="${r.jen_gideri!=null?r.jen_gideri:''}"></td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="kz-pos" value="${r.pos_gider!=null?r.pos_gider:''}"></td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="kz-tel" value="${r.tel_kasa_gelir!=null?r.tel_kasa_gelir:''}"></td>`+
+      `<td class="num">`+
+      `<button type="button" class="oto-save tb-btn act" data-id="${r.id}" title="Kaydet">✓</button> `+
+      `<button type="button" class="oto-cancel tb-btn" data-id="${r.id}" title="Vazgeç">✕</button>`+
+      `</td></tr>`;
+  }
+  function renderList(rows){
+    if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz kayıt yok</div>'; return; }
+    let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
+      `<th>Dönem</th><th>Jeneratör Gideri</th><th>POS Gideri</th><th>Tel Kasa Geliri</th><th></th></tr></thead><tbody>`;
+    rows.forEach(r=>{ h+= (String(r.id)===String(editingId)) ? editRow(r) : viewRow(r); });
+    h+='</tbody></table></div>';
+    listHost.innerHTML=h;
+
+    listHost.querySelectorAll('.oto-del').forEach(b=> b.onclick=async()=>{
+      if(!confirm('Bu kaydı silmek istiyor musunuz?')) return;
+      b.disabled=true;
+      const { error }=await sb.from('kar_zarar').delete().eq('id',b.dataset.id);
+      if(error){ alert('Silinemedi: '+error.message); b.disabled=false; return; }
+      refresh();
+    });
+    listHost.querySelectorAll('.oto-edit').forEach(b=> b.onclick=()=>{ editingId=b.dataset.id; renderList(rows); });
+    listHost.querySelectorAll('.oto-cancel').forEach(b=> b.onclick=()=>{ editingId=null; renderList(rows); });
+    listHost.querySelectorAll('.oto-save').forEach(b=> b.onclick=async()=>{
+      const tr=b.closest('tr');
+      const val=cls=>{ const x=tr.querySelector('.'+cls).value; return x===''?null:Number(x); };
+      const row={ jen_gideri:val('kz-jen'), pos_gider:val('kz-pos'), tel_kasa_gelir:val('kz-tel') };
+      b.disabled=true;
+      const { error }=await sb.from('kar_zarar').update(row).eq('id', b.dataset.id);
+      if(error){ alert('Kaydedilemedi: '+error.message); b.disabled=false; return; }
+      editingId=null;
+      refresh();
+    });
+  }
+  async function refresh(){
+    listHost.textContent='Yükleniyor…';
+    const { data, error }=await sb.from('kar_zarar').select('*').order('yıl',{ascending:false}).order('ay',{ascending:false});
+    if(error){ listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(error.message)+'</div>'; return; }
+    renderList(data||[]);
+  }
+  panelEl.querySelector('#kzForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const f=e.target;
+    const num=n=>{ const x=f.elements[n].value; return x===''?null:Number(x); };
+    const row={ 'yıl':Number(f.elements.yil.value), ay:Number(f.elements.ay.value),
+      jen_gideri:num('jen_gideri'), pos_gider:num('pos_gider'), tel_kasa_gelir:num('tel_kasa_gelir') };
+    const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
+    const { error }=await sb.from('kar_zarar').insert(row);
+    btn.disabled=false;
+    if(error){ alert('Eklenemedi: '+error.message); return; }
+    f.reset();
+    f.elements.yil.value=curYear;
+    refresh();
+  });
+  refresh();
+}
 RENDERERS.final=(v)=>{
+  const sb=window.__SB__;
+  if(sb) renderKarZararForm(v, sb);
   const O=fO();
   const enfDahil=enfGet();
   const R=finRows(O,'ch',enfDahil);

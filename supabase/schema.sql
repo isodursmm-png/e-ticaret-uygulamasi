@@ -126,8 +126,14 @@ create table if not exists public.araclar (
   plaka       text        not null,
   sube        text,
   sofor       text,
-  kullanim    text
+  kullanim    text,
+  kaynak      text,
+  maas        numeric
 );
+
+-- Onceden olusturulmus tablolarda eksikse eklenir (idempotent).
+alter table public.araclar add column if not exists kaynak text;
+alter table public.araclar add column if not exists maas numeric;
 
 create index if not exists araclar_plaka_idx on public.araclar (plaka);
 
@@ -173,3 +179,33 @@ create policy "read_authenticated"
   for select
   to authenticated
   using (true);
+
+-- ============================================================================
+--  KÂR / ZARAR EK KAYIT  —  kar_zarar
+--  ----------------------------------------------------------------------------
+--  FİNAL — Kâr/Zarar sayfasının başındaki form. Otomatik hesaba dahil olmayan
+--  aylık gider/gelir kalemleri (jeneratör, POS, telefon kasa) burada elle
+--  tutulur. Doğrudan tarayıcıdan (anon anahtar + oturum) yazılır/okunur —
+--  vehicle_logs/araclar ile aynı yetki modeli.
+-- ============================================================================
+create table if not exists public.kar_zarar (
+  id              bigint generated always as identity primary key,
+  created_at      timestamptz not null default now(),
+  "yıl"           bigint,
+  ay              bigint,
+  jen_gideri      numeric,
+  pos_gider       numeric,
+  tel_kasa_gelir  numeric
+);
+
+create index if not exists kar_zarar_yil_ay_idx on public.kar_zarar ("yıl", ay);
+
+alter table public.kar_zarar enable row level security;
+
+drop policy if exists "authenticated_all" on public.kar_zarar;
+create policy "authenticated_all"
+  on public.kar_zarar
+  for all
+  to authenticated
+  using (true)
+  with check (true);
