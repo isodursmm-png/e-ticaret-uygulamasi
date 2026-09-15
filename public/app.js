@@ -505,8 +505,11 @@ function panel(title, sub, node, opts){
   return p;
 }
 
-/* ---------- grafiği e-posta ile gönder (yerel servis: _kaynak/mail-service.js) ---------- */
-const MAIL_SVC='http://localhost:8788';
+/* ---------- grafiği e-posta ile gönder ----------
+   Sunucu/SMTP gerektirmez: grafiği PNG olarak panoya (clipboard) kopyalar ve
+   varsayılan e-posta istemcisini "mailto:" ile alıcı+konu+özet dolu açar —
+   kullanıcı gövdeye Ctrl+V ile yapıştırıp gönderir (mailto ekli dosya taşıyamaz,
+   tarayıcı/işletim sistemi güvenlik kısıtı — bu yüzden pano+yapıştır yolu kullanılır). */
 function panelSvgToPng(panelEl){
   return new Promise((resolve,reject)=>{
     const svg=panelEl.querySelector('svg');
@@ -531,6 +534,12 @@ function panelSvgToPng(panelEl){
     img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(xml);
   });
 }
+/** dataURL (data:image/png;base64,...) → tarayıcı panosuna görsel olarak kopyalar. */
+async function copyPngToClipboard(dataUrl){
+  if(!navigator.clipboard || typeof ClipboardItem==='undefined') throw new Error('Bu tarayıcı panoya görsel kopyalamayı desteklemiyor');
+  const blob=await (await fetch(dataUrl)).blob();
+  await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+}
 function mailBar(panelEl, title){
   const bar=document.createElement('div'); bar.className='pmail';
   bar.innerHTML=`<span class="pmail-ic">📧</span>`+
@@ -548,12 +557,14 @@ function mailBar(panelEl, title){
       const extra=(panelEl.querySelector('.heat-note')||panelEl.querySelector('.sub'));
       const ozet=title+(extra?' — '+extra.textContent.replace(/\s+/g,' ').trim():'')+
         (fullRange()?' · tüm veri':' · '+F.d(S.from)+' – '+F.d(S.to));
-      const r=await fetch(MAIL_SVC+'/gonder',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({to,konu:'E-Ticaret Analizleri — '+title,png,ozet})});
-      const j=await r.json().catch(()=>({ok:false,hata:'yanıt okunamadı'}));
-      if(j.ok) setMsg('Gönderildi ✓','ok'); else setMsg(j.hata||'Gönderilemedi','err');
+      let kopyalandi=false;
+      try{ await copyPngToClipboard(png); kopyalandi=true; }catch(e){ /* pano izni yok/desteklenmiyor — e-posta yine de açılır */ }
+      const konu='E-Ticaret Analizleri — '+title;
+      const govde=ozet+(kopyalandi?'\n\n(Grafik panoya kopyalandı — bu e-postaya Ctrl+V ile yapıştırın)':'');
+      location.href='mailto:'+to+'?subject='+encodeURIComponent(konu)+'&body='+encodeURIComponent(govde);
+      setMsg(kopyalandi?'E-posta açıldı — grafiği Ctrl+V ile yapıştırın':'E-posta açıldı (grafik panoya kopyalanamadı, tarayıcı izni gerekebilir)', kopyalandi?'ok':'err');
     }catch(e){
-      setMsg('Yerel servis kapalı — çalıştırın: node _kaynak/mail-service.js','err');
+      setMsg('Grafik hazırlanamadı: '+e.message,'err');
     }finally{ btn.disabled=false; }
   };
   inp.addEventListener('keydown',e=>{ if(e.key==='Enter') btn.click(); });
