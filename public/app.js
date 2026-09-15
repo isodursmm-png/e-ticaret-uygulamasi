@@ -506,32 +506,26 @@ function panel(title, sub, node, opts){
 }
 
 /* ---------- grafiği e-posta ile gönder ----------
-   Sunucu/SMTP gerektirmez: grafiği PNG olarak panoya (clipboard) kopyalar ve
-   varsayılan e-posta istemcisini "mailto:" ile alıcı+konu+özet dolu açar —
-   kullanıcı gövdeye Ctrl+V ile yapıştırıp gönderir (mailto ekli dosya taşıyamaz,
-   tarayıcı/işletim sistemi güvenlik kısıtı — bu yüzden pano+yapıştır yolu kullanılır). */
-function panelSvgToPng(panelEl){
+   Market Fiyatları uygulamasındaki aynı mantık: birincil yol gerçek gönderim
+   (yerel _kaynak/mail-service.js → Gmail SMTP, resim hem gövdeye gömülü hem ek
+   olarak gider); o servis kapalıysa/başarısızsa panoya kopyala + mailto:
+   taslağı + sürüklenebilir/indirilebilir önizlemeye düşer. Görsel SVG değil,
+   html2canvas ile PANELİN EKRANDAKİ BİREBİR görüntüsü olarak yakalanır — üstteki
+   not/liste metinleri de dahil olsun diye (yalnız SVG'yi almak bunları atlıyordu). */
+const MAIL_SVC='http://localhost:8788';
+function panelToPng(panelEl){
   return new Promise((resolve,reject)=>{
-    const svg=panelEl.querySelector('svg');
-    if(!svg){ reject(new Error('grafik (svg) bulunamadı')); return; }
-    const vb=(svg.getAttribute('viewBox')||'').split(/[\s,]+/).map(Number);
-    const w=Math.round(vb[2]||svg.clientWidth||800), h=Math.round(vb[3]||svg.clientHeight||400);
-    const clone=svg.cloneNode(true);
-    clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
-    clone.setAttribute('width',w); clone.setAttribute('height',h);
-    clone.setAttribute('font-family','"IBM Plex Sans",system-ui,sans-serif');
-    const xml=new XMLSerializer().serializeToString(clone);
+    if(!window.html2canvas){ reject(new Error('html2canvas yüklenemedi')); return; }
+    const clone=panelEl.cloneNode(true);
+    clone.querySelectorAll('.pmail').forEach(el=>el.remove());
+    const rect=panelEl.getBoundingClientRect();
+    clone.style.position='fixed'; clone.style.top='-10000px'; clone.style.left='0';
+    clone.style.width=Math.round(rect.width)+'px'; clone.style.margin='0';
+    document.body.appendChild(clone);
     const bg=getComputedStyle(panelEl).backgroundColor||'#ffffff';
-    const img=new Image();
-    img.onload=()=>{
-      const sc=2, c=document.createElement('canvas'); c.width=w*sc; c.height=h*sc;
-      const ctx=c.getContext('2d'); ctx.scale(sc,sc);
-      ctx.fillStyle=bg; ctx.fillRect(0,0,w,h);
-      ctx.drawImage(img,0,0,w,h);
-      try{ resolve(c.toDataURL('image/png')); }catch(e){ reject(e); }
-    };
-    img.onerror=()=>reject(new Error('grafik görsele çevrilemedi'));
-    img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(xml);
+    window.html2canvas(clone,{backgroundColor:bg,scale:2,useCORS:true})
+      .then(canvas=>{ clone.remove(); resolve(canvas.toDataURL('image/png')); })
+      .catch(e=>{ clone.remove(); reject(e); });
   });
 }
 /** dataURL (data:image/png;base64,...) → tarayıcı panosuna görsel olarak kopyalar. */
@@ -549,27 +543,38 @@ function mailBar(panelEl, title){
   const inp=bar.querySelector('.pmail-in'), btn=bar.querySelector('.pmail-btn'), msg=bar.querySelector('.pmail-msg');
   const setMsg=(t,cls)=>{ msg.textContent=t; msg.className='pmail-msg'+(cls?' '+cls:''); };
   let preview=null;
+  // Sunucu (mail-service.js) başarısız/kapalıysa: panoya kopyala + mailto taslağı + sürüklenebilir önizleme.
+  function yedekAc(to,konu,ozet,png){
+    let kopyalandi=false;
+    copyPngToClipboard(png).then(()=>{ kopyalandi=true; }).catch(()=>{}).finally(()=>{
+      const govde=ozet+'\n\n(Grafiği bu e-postaya eklemek için: az önce açılan sayfadaki küçük resmi taslağa sürükleyin, veya indirip ekleyin.)';
+      location.href='mailto:'+to+'?subject='+encodeURIComponent(konu)+'&body='+encodeURIComponent(govde);
+      if(preview) preview.remove();
+      preview=document.createElement('div'); preview.className='pmail-preview';
+      preview.innerHTML=`<img class="pmail-thumb" src="${png}" draggable="true" alt="grafik" title="Bu resmi sürükleyip e-posta taslağına bırakın">`+
+        `<span class="hint">↑ resmi taslağa sürükleyin</span>`+
+        `<a href="${png}" download="grafik.png">veya indirip ekleyin</a>`;
+      bar.appendChild(preview);
+      setMsg('E-posta açıldı (yerel gönderim servisi kapalı)','err');
+    });
+  }
   btn.onclick=async()=>{
     const to=(inp.value||'').trim();
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){ setMsg('Geçerli bir e-posta girin','err'); inp.focus(); return; }
     setMsg('Hazırlanıyor…'); btn.disabled=true;
     if(preview){ preview.remove(); preview=null; }
     try{
-      const png=await panelSvgToPng(panelEl);
+      const png=await panelToPng(panelEl);
       const extra=(panelEl.querySelector('.heat-note')||panelEl.querySelector('.sub'));
       const ozet=title+(extra?' — '+extra.textContent.replace(/\s+/g,' ').trim():'')+
         (fullRange()?' · tüm veri':' · '+F.d(S.from)+' – '+F.d(S.to));
-      let kopyalandi=false;
-      try{ await copyPngToClipboard(png); kopyalandi=true; }catch(e){ /* pano izni yok/desteklenmiyor — resmi sürükleyerek/indirerek eklemek yine mümkün */ }
       const konu='E-Ticaret Analizleri — '+title;
-      const govde=ozet+'\n\n(Grafiği bu e-postaya eklemek için: az önce açılan sayfadaki küçük resmi taslağa sürükleyin, veya indirip ekleyin.)';
-      location.href='mailto:'+to+'?subject='+encodeURIComponent(konu)+'&body='+encodeURIComponent(govde);
-      preview=document.createElement('div'); preview.className='pmail-preview';
-      preview.innerHTML=`<img class="pmail-thumb" src="${png}" draggable="true" alt="grafik" title="Bu resmi sürükleyip e-posta taslağına bırakın">`+
-        `<span class="hint">↑ resmi taslağa sürükleyin</span>`+
-        `<a href="${png}" download="grafik.png">veya indirip ekleyin</a>`;
-      bar.appendChild(preview);
-      setMsg('E-posta açıldı','ok');
+      try{
+        const r=await fetch(MAIL_SVC+'/gonder',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({to,konu,png,ozet})});
+        const j=await r.json().catch(()=>({ok:false}));
+        if(j.ok) setMsg('Gönderildi ✓','ok'); else yedekAc(to,konu,ozet,png);
+      }catch(e){ yedekAc(to,konu,ozet,png); }
     }catch(e){
       setMsg('Grafik hazırlanamadı: '+e.message,'err');
     }finally{ btn.disabled=false; }
