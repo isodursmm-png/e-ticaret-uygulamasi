@@ -306,10 +306,26 @@ input.fin-oto:focus,input.fin-pers:focus,input.fin-gider:focus{outline:none; bor
   white-space:nowrap; transition:background .12s, border-color .12s, color .12s}
 .chip-btn:hover{border-color:var(--s8); color:var(--ink)}
 .chip-btn.on{background:var(--s8); border-color:var(--s8); color:#fff}
+/* her grup kendi (soluk) rengiyle ayırt edilsin — Kullanım / Araç Kaynağı / Personel Kaynağı */
+#kullanimChips .chip-btn:hover, .ar-kullanim .chip-btn:hover{border-color:#6366f1; color:#6366f1}
+#kullanimChips .chip-btn.on, .ar-kullanim .chip-btn.on{
+  background:color-mix(in srgb,#6366f1 20%, var(--surface)); border-color:color-mix(in srgb,#6366f1 55%, transparent); color:#6366f1}
+#aracKaynakChips .chip-btn:hover, .ar-arac-kaynak .chip-btn:hover{border-color:#14b8a6; color:#14b8a6}
+#aracKaynakChips .chip-btn.on, .ar-arac-kaynak .chip-btn.on{
+  background:color-mix(in srgb,#14b8a6 20%, var(--surface)); border-color:color-mix(in srgb,#14b8a6 55%, transparent); color:#14b8a6}
+#persKaynakChips .chip-btn:hover, .ar-pers-kaynak .chip-btn:hover{border-color:#f59e0b; color:#f59e0b}
+#persKaynakChips .chip-btn.on, .ar-pers-kaynak .chip-btn.on{
+  background:color-mix(in srgb,#f59e0b 20%, var(--surface)); border-color:color-mix(in srgb,#f59e0b 55%, transparent); color:#f59e0b}
 th.oto-vurgu,td.oto-vurgu{color:#f97316; font-weight:700}
 th.oto-vurgu{background:color-mix(in srgb, #f97316 16%, transparent)}
 button.oto-del{border:1px solid var(--hair-strong); background:var(--surface); color:var(--muted);
   border-radius:6px; padding:2px 8px; font-size:12px; cursor:pointer}
+/* Araçlar tablosu satır düzenlemesi çok genişleyebiliyor (3 chip grubu) —
+   Kaydet(✓)/Vazgeç(✕) sütunu sağda sabit kalsın, kaydırmadan her zaman görünsün */
+#aracList table.dt th:last-child, #aracList table.dt td:last-child{
+  position:sticky; right:0; background:var(--panel); box-shadow:-6px 0 8px -6px rgba(0,0,0,.35)}
+#aracList table.dt thead th:last-child{background:var(--brand-grad)}
+#aracList table.dt tbody tr:hover td:last-child{background:var(--surface-2)}
 button.oto-del:hover{color:var(--crit); border-color:var(--crit)}
 .pgr{display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:10px; font-size:12px; color:var(--ink-2)}
 .pgr button{border:1px solid var(--hair-strong); background:var(--surface); border-radius:7px; padding:4px 10px; color:var(--ink-2)}
