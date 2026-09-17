@@ -173,3 +173,35 @@ create policy "read_authenticated"
   for select
   to authenticated
   using (true);
+
+-- ============================================================================
+--  TGO ARŞİVİ (2022-2024)  —  tgo_arsiv_2022_2024
+--  ----------------------------------------------------------------------------
+--  Trendyol GO (grocery) sipariş API'si (packages) eski ayları güvenilir
+--  dönmüyor; bu yüzden 2022-02-02 (ilk veri) → 2024-12-31 dönemi Trendyol'un
+--  finans/settlements (Cari Hesap Ekstresi) API'sinden tek seferlik olarak bu
+--  AYRI arşiv tabloya çekiliyor — raw_orders/analytics_payload'a (canlı pano)
+--  KARIŞMIYOR. Doldurma: scripts/tgo-arsiv-doldur.js. Yazma yalnızca
+--  service_role ile; tarayıcı sadece okur.
+-- ============================================================================
+create table if not exists public.tgo_arsiv_2022_2024 (
+  id          bigint generated always as identity primary key,
+  order_no    text        not null unique,
+  store_id    text,
+  store_name  text,
+  order_date  timestamptz,
+  tutar       numeric     not null default 0,   -- "Satış" kalemlerinin credit toplamı
+  komisyon    numeric     not null default 0,   -- commissionAmount toplamı
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists tgo_arsiv_2022_2024_order_date_idx on public.tgo_arsiv_2022_2024 (order_date);
+
+alter table public.tgo_arsiv_2022_2024 enable row level security;
+
+drop policy if exists "read_authenticated" on public.tgo_arsiv_2022_2024;
+create policy "read_authenticated"
+  on public.tgo_arsiv_2022_2024
+  for select
+  to authenticated
+  using (true);
