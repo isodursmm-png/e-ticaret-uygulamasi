@@ -291,17 +291,22 @@ input.fin-oto:focus,input.fin-pers:focus,input.fin-gider:focus{outline:none; bor
   background:var(--surface); border:1px solid var(--hair-strong); border-radius:8px; padding:6px 10px; cursor:pointer; max-width:280px}
 .fin-storesel:focus{outline:none; border-color:var(--good); box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 30%,transparent)}
 /* E-Ticaret Otoları */
-.oto-form{display:flex; flex-wrap:nowrap; gap:10px; align-items:flex-end; overflow-x:auto}
-.oto-form label{display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:600; color:var(--ink-2); flex:1 1 100px; min-width:64px}
-.oto-form label:has(input[name="maas"]){flex-basis:76px}
-.oto-form label:has(.chip-group){flex:2 1 170px}
-.oto-form input{font:inherit; font-size:13px; font-weight:500; color:var(--ink); background:var(--surface);
-  border:1px solid var(--hair-strong); border-radius:8px; padding:7px 10px; width:100%; min-width:0}
+.oto-form{display:flex; flex-wrap:nowrap; gap:7px; align-items:flex-end; overflow-x:auto}
+.oto-form label{display:flex; flex-direction:column; gap:3px; font-size:10.5px; font-weight:600; color:var(--ink-2); flex:1 1 78px; min-width:50px}
+.oto-form label:has(input[name="maas"]){flex-basis:60px}
+.oto-form label:has(.chip-group){flex:2 1 150px}
+.oto-form input{font:inherit; font-size:12.5px; font-weight:500; color:var(--ink); background:var(--surface);
+  border:1px solid var(--hair-strong); border-radius:7px; padding:6px 8px; width:100%; min-width:0}
 .oto-form input:focus{outline:none; border-color:var(--s8); box-shadow:0 0 0 3px color-mix(in srgb,var(--s8) 25%,transparent)}
 .oto-form button{flex:0 0 auto; align-self:flex-end; background:var(--s8); border-color:var(--s8); color:#fff}
+/* dikey ayraç: ekleme formu ile yakıt-ay filtresi arasında */
+.oto-sep{flex:0 0 auto; align-self:stretch; width:1px; margin:2px 1px; background:var(--hair-strong)}
+/* Yakıt Tutarı — Ay: ayrı satır yerine aynı satırda, dar sabit genişlikte */
+.oto-form label.oto-yakit-ay{flex:0 0 auto; min-width:0}
+.oto-form label.oto-yakit-ay input{width:122px}
 /* Araç/Personel Kaynağı, Kullanım: metin yerine tıklayarak çoklu seçim ("chip") */
-.chip-group{display:flex; flex-wrap:wrap; gap:5px; padding-top:1px}
-.chip-btn{font:inherit; font-size:10.5px; font-weight:700; padding:5px 10px; border-radius:999px;
+.chip-group{display:flex; flex-wrap:wrap; gap:4px; padding-top:1px}
+.chip-btn{font:inherit; font-size:10px; font-weight:700; padding:4px 8px; border-radius:999px;
   border:1px solid var(--hair-strong); background:var(--surface); color:var(--ink-2); cursor:pointer;
   white-space:nowrap; transition:background .12s, border-color .12s, color .12s}
 .chip-btn:hover{border-color:var(--s8); color:var(--ink)}

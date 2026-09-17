@@ -1364,11 +1364,10 @@ function renderAraclarPanel(v, sb){
       <label>Personel Kaynağı<div class="chip-group" id="persKaynakChips">${chipButtons(CH)}</div></label>
       <label>Maaş<input type="number" step="0.01" min="0" name="maas" placeholder="₺"></label>
       <button type="submit" class="tb-btn act">+ Ekle</button>
-    </form>
-    <div class="oto-form" style="margin-top:10px">
-      <label>Yakıt Tutarı — Ay<input type="month" id="aracYakitAy"></label>
+      <span class="oto-sep" aria-hidden="true"></span>
+      <label class="oto-yakit-ay" title="Yakıt tutarını görüntülemek istediğiniz ay (boş=tümü)">Yakıt Ay<input type="month" id="aracYakitAy"></label>
       <button type="button" id="aracYakitAyAll" class="tb-btn">Tümü</button>
-    </div>`);
+    </form>`);
   panelEl.querySelectorAll('#aracKaynakChips, #persKaynakChips, #kullanimChips').forEach(wireChips);
   const listHost=document.createElement('div'); listHost.id='aracList'; listHost.textContent='Yükleniyor…';
   panelEl.appendChild(listHost);
@@ -1471,7 +1470,9 @@ function renderAraclarPanel(v, sb){
     const { error }=await sb.from('araclar').insert(row);
     btn.disabled=false;
     if(error){ alert('Eklenemedi: '+error.message); return; }
+    const yakitAyKeep=yakitAyInput.value;
     f.reset();
+    yakitAyInput.value=yakitAyKeep;
     f.querySelectorAll('.chip-btn.on').forEach(b=>b.classList.remove('on'));
     refresh();
   });
