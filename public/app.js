@@ -1351,6 +1351,13 @@ function wireChips(container){
 function chipValue(container){
   return [...container.querySelectorAll('.chip-btn.on')].map(b=>b.dataset.v).join(', ') || null;
 }
+/* Tablo (salt-okunur) görünümünde de aynı yeşil rozet stiliyle göster —
+   sadece ekleme/düzenleme formunda değil. */
+function chipBadges(value){
+  const items=String(value||'').split(',').map(s=>s.trim()).filter(Boolean);
+  if(!items.length) return '—';
+  return `<div class="chip-group">${items.map(o=>`<span class="chip-badge">${esc(o)}</span>`).join('')}</div>`;
+}
 function renderAraclarPanel(v, sb){
   const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, kullanım amacı, araç/personel kaynağı, maaş, yakıt tutarı');
   panelEl.insertAdjacentHTML('beforeend', `
@@ -1382,8 +1389,8 @@ function renderAraclarPanel(v, sb){
   function viewRow(r){
     return `<tr data-id="${r.id}">`+
       `<td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td><td>${esc(r.sofor||'')}</td>`+
-      `<td>${esc(r.kullanim||'')}</td>`+
-      `<td>${esc(r.arac_kaynak||'')}</td><td>${esc(r.pers_kaynak||'')}</td>`+
+      `<td>${chipBadges(r.kullanim)}</td>`+
+      `<td>${chipBadges(r.arac_kaynak)}</td><td>${chipBadges(r.pers_kaynak)}</td>`+
       `<td class="num">${r.maas!=null?esc(F.tl(r.maas)):'—'}</td>`+
       `<td class="num">${esc(F.tl(r.yakit||0))}</td>`+
       `<td class="num">`+
