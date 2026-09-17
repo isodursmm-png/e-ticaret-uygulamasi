@@ -213,6 +213,43 @@ create policy "read_authenticated"
   using (true);
 
 -- ============================================================================
+--  TGO ÜRÜN ARŞİVİ (2022-2024)  —  tgo_urun_arsiv_2022_2024
+--  ----------------------------------------------------------------------------
+--  tgo_arsiv_2022_2024 sipariş bazında toplanmış (tutar/komisyon); ancak
+--  finans/settlements API'sinin ham kayıtları aslında BARKOD bazlı (bir
+--  siparişte birden çok satır olabilir). Bu tablo o ham satırları, tekilliği
+--  settlements kaydının kendi `id`'siyle korunarak tutar — ürün ADI/kategori
+--  YOK (yalnız barkod); onun için ayrıca barkod->ürün eşlemesi gerekir.
+--  Doldurma: scripts/tgo-urun-arsiv-doldur.js. Yazma yalnızca service_role
+--  ile; tarayıcı sadece okur.
+-- ============================================================================
+create table if not exists public.tgo_urun_arsiv_2022_2024 (
+  id            bigint generated always as identity primary key,
+  settlement_id text        not null unique,   -- ham settlements kaydının kendi id'si
+  order_no      text,
+  barcode       text,
+  store_id      text,
+  store_name    text,
+  order_date    timestamptz,
+  tutar         numeric     not null default 0,   -- credit
+  komisyon      numeric     not null default 0,   -- commissionAmount
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists tgo_urun_arsiv_2022_2024_order_no_idx on public.tgo_urun_arsiv_2022_2024 (order_no);
+create index if not exists tgo_urun_arsiv_2022_2024_barcode_idx on public.tgo_urun_arsiv_2022_2024 (barcode);
+create index if not exists tgo_urun_arsiv_2022_2024_order_date_idx on public.tgo_urun_arsiv_2022_2024 (order_date);
+
+alter table public.tgo_urun_arsiv_2022_2024 enable row level security;
+
+drop policy if exists "read_authenticated" on public.tgo_urun_arsiv_2022_2024;
+create policy "read_authenticated"
+  on public.tgo_urun_arsiv_2022_2024
+  for select
+  to authenticated
+  using (true);
+
+-- ============================================================================
 --  KÂR / ZARAR EK KAYIT  —  kar_zarar
 --  ----------------------------------------------------------------------------
 --  FİNAL — Kâr/Zarar sayfasının başındaki form. Otomatik hesaba dahil olmayan

@@ -362,6 +362,50 @@ async function fetchOrderFinance({ from, to }) {
   return out;
 }
 
+/** Ham "Satış" kalemlerini (barkod bazlı, AGGREGATE ETMEDEN) döndürür —
+    fetchOrderFinance bunları sipariş bazında toplayıp barkod detayını atıyor;
+    ürün/barkod düzeyinde arşiv gerektiğinde bu kullanılır. Tek çağrıda tek
+    pencere (to-from <= CHE_WIN) taranması önerilir — çağıran taraf büyük
+    aralıkları kendi pencereleyip aralarda bekleterek 429 riskini azaltabilir
+    (bkz. scripts/tgo-urun-arsiv-doldur.js). */
+async function fetchSettlementLines({ from, to }) {
+  const c = cfg();
+  if (!c.sellerId || !c.token || !(to > from)) return [];
+  const headers = { Authorization: `Basic ${c.token}`, Accept: 'application/json' };
+  const out = [];
+  const iso = (t) => new Date(t).toISOString().slice(0, 10);
+  let winEnd = to, guard = 0;
+
+  while (winEnd > from && guard < 500) {
+    const winStart = Math.max(winEnd - CHE_WIN, from);
+    let page = 0, totalPages = 1, winCount = 0;
+    while (page < totalPages && page < 200) {
+      const qs = new URLSearchParams({
+        startDate: String(winStart), endDate: String(winEnd),
+        transactionType: 'Sale', page: String(page), size: '1000'
+      });
+      let body;
+      try {
+        body = await jget(`${CHE_BASE}/sellers/${c.sellerId}/settlements?${qs}`, { headers });
+      } catch (e) {
+        log(id, `⚠ ürün-satır [${iso(winStart)}→${iso(winEnd)}] alınamadı: ${e.message}`);
+        break;
+      }
+      const list = Array.isArray(body && body.content) ? body.content : [];
+      totalPages = (body && body.totalPages) || 1;
+      out.push(...list);
+      winCount += list.length;
+      if (!list.length) break;
+      page++;
+    }
+    guard++;
+    log(id, `ürün-satır penceresi [${iso(winStart)}→${iso(winEnd)}] — +${winCount} kayıt (${out.length} toplam)`);
+    winEnd = winStart;
+    if (winStart <= from) break;
+  }
+  return out;
+}
+
 async function fetch(opts) {
   const pkgs = await fetchPackages(opts);
   const rows = toRows(pkgs);
@@ -390,4 +434,4 @@ async function fetch(opts) {
   return rows;
 }
 
-module.exports = { id, configured, fetch, fetchCommissions, fetchOrderFinance };
+module.exports = { id, configured, fetch, fetchCommissions, fetchOrderFinance, fetchSettlementLines };
