@@ -1335,6 +1335,22 @@ RENDERERS.final=(v)=>{
 
 /* ============ E-TİCARET OTOLARI — araçlar + Petrol Ofisi yakıt alımları (canlı Supabase) ============ */
 /* ---- Araçlar: filo listesi (plaka/şube/şoför/kullanım) — public.araclar ---- */
+/** Araç/Personel Kaynağı (pazaryeri) ve Kullanım alanları: serbest metin yerine
+    tıklayarak birden fazla seçilebilen küçük "chip" düğmeleri — değer, seçili
+    chip'lerin virgülle birleştirilmiş adı olarak saklanır (eski metin alanlarıyla
+    aynı format, geriye dönük uyumlu). selected: "Ticimax, Trendyol" gibi mevcut
+    virgüllü değer (düzenleme satırı için). */
+const KULLANIM_OPTS=['Dağıtım','Servis','Depo','Ofis'];
+function chipButtons(options, selected){
+  const sel=new Set(String(selected||'').split(',').map(s=>s.trim().toLocaleLowerCase('tr-TR')).filter(Boolean));
+  return options.map(o=>`<button type="button" class="chip-btn${sel.has(o.toLocaleLowerCase('tr-TR'))?' on':''}" data-v="${esc(o)}">${esc(o)}</button>`).join('');
+}
+function wireChips(container){
+  container.querySelectorAll('.chip-btn').forEach(b=> b.onclick=()=> b.classList.toggle('on'));
+}
+function chipValue(container){
+  return [...container.querySelectorAll('.chip-btn.on')].map(b=>b.dataset.v).join(', ') || null;
+}
 function renderAraclarPanel(v, sb){
   const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, kullanım amacı, araç/personel kaynağı, maaş, yakıt tutarı');
   panelEl.insertAdjacentHTML('beforeend', `
@@ -1343,9 +1359,9 @@ function renderAraclarPanel(v, sb){
       <label>Şube<input type="text" name="sube" list="aracSubeList" placeholder="Erciyes" autocomplete="off"></label>
       <datalist id="aracSubeList">${DIMS.store.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
       <label>Şoför<input type="text" name="sofor" placeholder="Ad Soyad"></label>
-      <label>Kullanım<input type="text" name="kullanim" placeholder="Dağıtım / Servis / ..."></label>
-      <label>Araç Kaynağı<input type="text" name="arac_kaynak" placeholder="Kiralık / Şirket / ..."></label>
-      <label>Personel Kaynağı<input type="text" name="pers_kaynak" placeholder="Şirket / Taşeron / ..."></label>
+      <label>Kullanım<div class="chip-group" id="kullanimChips">${chipButtons(KULLANIM_OPTS)}</div></label>
+      <label>Araç Kaynağı<div class="chip-group" id="aracKaynakChips">${chipButtons(CH)}</div></label>
+      <label>Personel Kaynağı<div class="chip-group" id="persKaynakChips">${chipButtons(CH)}</div></label>
       <label>Maaş<input type="number" step="0.01" min="0" name="maas" placeholder="₺"></label>
       <button type="submit" class="tb-btn act">+ Ekle</button>
     </form>
@@ -1353,6 +1369,7 @@ function renderAraclarPanel(v, sb){
       <label>Yakıt Tutarı — Ay<input type="month" id="aracYakitAy"></label>
       <button type="button" id="aracYakitAyAll" class="tb-btn">Tümü</button>
     </div>`);
+  panelEl.querySelectorAll('#aracKaynakChips, #persKaynakChips, #kullanimChips').forEach(wireChips);
   const listHost=document.createElement('div'); listHost.id='aracList'; listHost.textContent='Yükleniyor…';
   panelEl.appendChild(listHost);
   v.appendChild(panelEl);
@@ -1380,9 +1397,9 @@ function renderAraclarPanel(v, sb){
       `<td><input type="text" class="ar-plaka" value="${esc(r.plaka||'')}" style="text-transform:uppercase"></td>`+
       `<td><input type="text" class="ar-sube" list="aracSubeList" value="${esc(r.sube||'')}"></td>`+
       `<td><input type="text" class="ar-sofor" value="${esc(r.sofor||'')}"></td>`+
-      `<td><input type="text" class="ar-kullanim" value="${esc(r.kullanim||'')}"></td>`+
-      `<td><input type="text" class="ar-arac-kaynak" value="${esc(r.arac_kaynak||'')}"></td>`+
-      `<td><input type="text" class="ar-pers-kaynak" value="${esc(r.pers_kaynak||'')}"></td>`+
+      `<td><div class="chip-group ar-kullanim">${chipButtons(KULLANIM_OPTS,r.kullanim)}</div></td>`+
+      `<td><div class="chip-group ar-arac-kaynak">${chipButtons(CH,r.arac_kaynak)}</div></td>`+
+      `<td><div class="chip-group ar-pers-kaynak">${chipButtons(CH,r.pers_kaynak)}</div></td>`+
       `<td class="num"><input type="number" step="0.01" min="0" class="ar-maas" value="${r.maas!=null?r.maas:''}"></td>`+
       `<td class="num">${esc(F.tl(r.yakit||0))}</td>`+
       `<td class="num">`+
@@ -1398,6 +1415,7 @@ function renderAraclarPanel(v, sb){
     rows.forEach(r=>{ h+= (String(r.id)===String(editingId)) ? editRow(r) : viewRow(r); });
     h+='</tbody></table></div>';
     listHost.innerHTML=h;
+    listHost.querySelectorAll('.chip-group').forEach(wireChips);
 
     listHost.querySelectorAll('.oto-del').forEach(b=> b.onclick=async()=>{
       if(!confirm('Bu aracı silmek istiyor musunuz?')) return;
@@ -1414,8 +1432,8 @@ function renderAraclarPanel(v, sb){
       const plaka=String(val('ar-plaka')||'').toUpperCase();
       if(!plaka){ alert('Plaka gerekli.'); return; }
       const maasRaw=tr.querySelector('.ar-maas').value;
-      const row={ plaka, sube:val('ar-sube'), sofor:val('ar-sofor'), kullanim:val('ar-kullanim'),
-        arac_kaynak:val('ar-arac-kaynak'), pers_kaynak:val('ar-pers-kaynak'),
+      const row={ plaka, sube:val('ar-sube'), sofor:val('ar-sofor'), kullanim:chipValue(tr.querySelector('.ar-kullanim')),
+        arac_kaynak:chipValue(tr.querySelector('.ar-arac-kaynak')), pers_kaynak:chipValue(tr.querySelector('.ar-pers-kaynak')),
         maas: maasRaw===''?null:Number(maasRaw) };
       b.disabled=true;
       const { error }=await sb.from('araclar').update(row).eq('id', b.dataset.id);
@@ -1446,14 +1464,15 @@ function renderAraclarPanel(v, sb){
     const plaka=String(val('plaka')||'').trim().toUpperCase();
     if(!plaka){ alert('Plaka gerekli.'); return; }
     const maasRaw=f.elements.maas.value;
-    const row={ plaka, sube:val('sube'), sofor:val('sofor'), kullanim:val('kullanim'),
-      arac_kaynak:val('arac_kaynak'), pers_kaynak:val('pers_kaynak'),
+    const row={ plaka, sube:val('sube'), sofor:val('sofor'), kullanim:chipValue(f.querySelector('#kullanimChips')),
+      arac_kaynak:chipValue(f.querySelector('#aracKaynakChips')), pers_kaynak:chipValue(f.querySelector('#persKaynakChips')),
       maas: maasRaw===''?null:Number(maasRaw) };
     const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
     const { error }=await sb.from('araclar').insert(row);
     btn.disabled=false;
     if(error){ alert('Eklenemedi: '+error.message); return; }
     f.reset();
+    f.querySelectorAll('.chip-btn.on').forEach(b=>b.classList.remove('on'));
     refresh();
   });
   refresh();
