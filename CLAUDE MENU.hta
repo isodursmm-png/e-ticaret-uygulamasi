@@ -527,13 +527,15 @@ function fmtRate(v) {
     return n.toFixed(2).replace('.', ',');
 }
 
-function loadFX() {
+function loadFX(silent) {
     var body = document.getElementById('fxBody');
     var dateEl = document.getElementById('fxDate');
     var btn = document.getElementById('fxRefresh');
-    body.innerHTML = '<div class="fx-loading">TCMB kurları yükleniyor...</div>';
-    if (btn) { btn.className = 'fx-refresh spinning'; }
-    fitHeader();
+    if (!silent) {
+        body.innerHTML = '<div class="fx-loading">TCMB kurları yükleniyor...</div>';
+        if (btn) { btn.className = 'fx-refresh spinning'; }
+        fitHeader();
+    }
     try {
         var xhr = new ActiveXObject('Msxml2.XMLHTTP.6.0');
         xhr.open('GET', 'https://www.tcmb.gov.tr/kurlar/today.xml', true);
@@ -575,19 +577,23 @@ function loadFX() {
                 body.innerHTML = html;
                 fitHeader();
             } catch (e2) {
-                body.innerHTML = '<div class="fx-error">Kurlar alinamadi (' + e2.message + ')</div>';
-                fitHeader();
+                if (!silent) {
+                    body.innerHTML = '<div class="fx-error">Kurlar alinamadi (' + e2.message + ')</div>';
+                    fitHeader();
+                }
             }
-            if (btn) { btn.className = 'fx-refresh'; }
+            if (btn && !silent) { btn.className = 'fx-refresh'; }
         };
         xhr.send();
     } catch (e) {
-        body.innerHTML = '<div class="fx-error">Kurlar alinamadi (internet/ActiveX)</div>';
-        if (btn) { btn.className = 'fx-refresh'; }
+        if (!silent) {
+            body.innerHTML = '<div class="fx-error">Kurlar alinamadi (internet/ActiveX)</div>';
+            if (btn) { btn.className = 'fx-refresh'; }
+        }
     }
 }
 loadFX();
-setInterval(loadFX, 15 * 60 * 1000); // Pano açık kaldığı sürece kurları 15 dakikada bir otomatik yenile
+setInterval(function () { loadFX(true); }, 15 * 60 * 1000); // Kurları 15 dakikada bir, kullanıcıya belli etmeden (sessiz) otomatik yenile
 
 // ─── Dosya açma fonksiyonu (WScript.Shell ile) ───────────────────────────────
 var _baseDir = null;

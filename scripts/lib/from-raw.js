@@ -14,6 +14,24 @@
 
 const BUCKETS = ['t0', 't1', 'ys', 'ty4', 'ty5'];
 
+/** Geçici hatalarda (statement timeout / ağ / 5xx) artan beklemeyle tekrar dener.
+    Tablo büyüdükçe tek bir sayfa sorgusu ara sıra DB yükü/timeout'a takılabiliyor —
+    tüm okuma (10+ dk) bu yüzden baştan başlamasın diye sayfa bazında dener. */
+async function withPageRetry(fn, tries = 4) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); }
+    catch (e) {
+      last = e;
+      const m = String((e && e.message) || e);
+      if (i < tries - 1 && /timeout|ETIMEDOUT|ECONNRESET|EAI_AGAIN|fetch failed|socket hang up|network|\b5\d\d\b/i.test(m)) {
+        await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+      } else throw e;
+    }
+  }
+  throw last;
+}
+
 /**
  * @param sb            supabase client (service_role)
  * @param opts.sinceISO sadece bu tarihten yeni siparişler (order_date >=)
@@ -35,14 +53,15 @@ async function fetchMergedFromRaw(sb, { sinceISO = null, pageSize = 1000, onProg
     let inclusive = true;   // aynı order_date sınırında satır kaçırmamak için ilk turda >=
     const seen = new Set();
     for (;;) {
-      let q = sb.from('raw_orders')
-        .select('key,bucket,data,order_date')
-        .order('order_date', { ascending: true })
-        .order('key', { ascending: true })
-        .limit(pageSize);
-      q = inclusive ? q.gte('order_date', cursor) : q.gt('order_date', cursor);
-
-      const { data, error } = await q;
+      const buildQ = () => {
+        let q = sb.from('raw_orders')
+          .select('key,bucket,data,order_date')
+          .order('order_date', { ascending: true })
+          .order('key', { ascending: true })
+          .limit(pageSize);
+        return inclusive ? q.gte('order_date', cursor) : q.gt('order_date', cursor);
+      };
+      const { data, error } = await withPageRetry(() => buildQ());
       if (error) throw new Error('raw_orders okuma: ' + error.message);
       if (!data || !data.length) break;
 
@@ -64,13 +83,14 @@ async function fetchMergedFromRaw(sb, { sinceISO = null, pageSize = 1000, onProg
   } else {
     let lastKey = '';
     for (;;) {
-      let q = sb.from('raw_orders')
-        .select('key,bucket,data,order_date')
-        .order('key', { ascending: true })
-        .limit(pageSize);
-      if (lastKey) q = q.gt('key', lastKey);
-
-      const { data, error } = await q;
+      const buildQ = () => {
+        let q = sb.from('raw_orders')
+          .select('key,bucket,data,order_date')
+          .order('key', { ascending: true })
+          .limit(pageSize);
+        return lastKey ? q.gt('key', lastKey) : q;
+      };
+      const { data, error } = await withPageRetry(() => buildQ());
       if (error) throw new Error('raw_orders okuma: ' + error.message);
       if (!data || !data.length) break;
 

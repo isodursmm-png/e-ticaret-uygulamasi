@@ -26,9 +26,10 @@ function manSet(field,dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_manKe
      - Pazaryerine göre tablo: araclar.arac_kaynak (yakıt) / araclar.pers_kaynak
        (personel) alanındaki, VİRGÜLLE AYRILMIŞ pazaryeri adları (Ticimax,
        Yemeksepeti, Trendyol) esas alınır. Tek pazaryeri yazılıysa tutarın
-       tamamı ona, birden çoksa payına düşen (tutar / pazaryeri sayısı) her
-       birine yazılır. Eşleşme yoksa (alan boş/tanınmayan) o araç pazaryeri
-       tablosuna dahil edilmez.
+       tamamı ona; birden çoksa tutar EŞİT değil, pazaryerlerinin CİROSUNA
+       ORANTILI paylaştırılır (chCiro ile) — ciro verisi yoksa (hepsi 0)
+       eşit paylaşıma düşülür. Eşleşme yoksa (alan boş/tanınmayan) o araç
+       pazaryeri tablosuna dahil edilmez.
    Senkron/hesaplanan veri olan hücreler salt-okunur olur; olmayanlarda elle
    giriş eskisi gibi çalışmaya devam eder. */
 const normSube = (s) => String(s||'').trim().toLocaleLowerCase('tr-TR');
@@ -40,6 +41,21 @@ const splitPazaryerleri = (s) => String(s||'').split(',').map(normSube).filter(B
    uyumsuzluk görülürse buraya bir satır eklemek yeterli. */
 const SUBE_ALIAS = { 'alanya oba': 'alanya' };
 const resolveSube = (s) => { const n=normSube(s); return SUBE_ALIAS[n] || n; };
+/** Bir pazaryerinin (kanalın) teslim edilen cirosu — mon ("YYYY-MM") verilirse
+    yalnız o ay, null ise tüm zamanlar. Oto/Personel masrafı birden çok
+    pazaryerine bölüştürülürken payları buna orantılı hesaplamak için. */
+function chCiro(chName, mon){
+  const t=normSube(chName); let s=0;
+  for(const o of ORD){ if(o.st!=='Teslim Edildi') continue; if(normSube(o.ch)!==t) continue; if(mon!=null && o.mon!==mon) continue; s+=o.ciro||0; }
+  return s;
+}
+/** tutar'ı, pazaryerleri listesine cirolarıyla orantılı paylaştırır — hiçbirinde
+    ciro yoksa eşit bölüştürür. mon: 'YYYY-MM' (aylık ciro) veya null (tüm zamanlar). */
+function ciroOrantiliPay(tutar, pazaryerleri, mon){
+  const ciros=pazaryerleri.map(p=>chCiro(p,mon));
+  const toplam=ciros.reduce((a,b)=>a+b,0);
+  return pazaryerleri.map((p,i)=>toplam>0 ? tutar*ciros[i]/toplam : tutar/pazaryerleri.length);
+}
 
 let YAKIT_BY_STORE_MON = new Map();   // "normalize(mağaza)|YYYY-MM" -> tutar
 let YAKIT_BY_CH_MON = new Map();      // "normalize(pazaryeri)|YYYY-MM" -> tutar (arac_kaynak'a göre paylaştırılmış)
@@ -56,8 +72,8 @@ let PERS_BY_CH = new Map();           // "normalize(pazaryeri)" -> toplam maaş 
       if(sube){ const k=resolveSube(sube)+'|'+mon; YAKIT_BY_STORE_MON.set(k,(YAKIT_BY_STORE_MON.get(k)||0)+tutar); }
       const pazaryerleri=splitPazaryerleri(r.araclar && r.araclar.arac_kaynak);
       if(pazaryerleri.length){
-        const pay=tutar/pazaryerleri.length;
-        for(const p of pazaryerleri){ const k=p+'|'+mon; YAKIT_BY_CH_MON.set(k,(YAKIT_BY_CH_MON.get(k)||0)+pay); }
+        const paylar=ciroOrantiliPay(tutar,pazaryerleri,mon);
+        pazaryerleri.forEach((p,i)=>{ const k=p+'|'+mon; YAKIT_BY_CH_MON.set(k,(YAKIT_BY_CH_MON.get(k)||0)+paylar[i]); });
       }
     }
     render();
@@ -73,13 +89,36 @@ let PERS_BY_CH = new Map();           // "normalize(pazaryeri)" -> toplam maaş 
       if(a.sube){ const k=resolveSube(a.sube); PERS_BY_STORE.set(k,(PERS_BY_STORE.get(k)||0)+maas); }
       const pazaryerleri=splitPazaryerleri(a.pers_kaynak);
       if(pazaryerleri.length){
-        const pay=maas/pazaryerleri.length;
-        for(const p of pazaryerleri){ PERS_BY_CH.set(p,(PERS_BY_CH.get(p)||0)+pay); }
+        const paylar=ciroOrantiliPay(maas,pazaryerleri,null);
+        pazaryerleri.forEach((p,i)=>{ PERS_BY_CH.set(p,(PERS_BY_CH.get(p)||0)+paylar[i]); });
       }
     }
     render();
   }catch(e){ /* sessiz geç — Personel masrafı elle girilmiş haliyle kalır */ }
 })();
+/* Jeneratör gideri / POS gideri / Tel kasa geliri — public.kar_zarar'dan
+   (pazaryeri × ay bazlı). Kâr/Zarar > Pazaryerine göre tablosunda o pazaryeri +
+   o ay ile birebir eşleşir (araclar/yakitlar deseniyle aynı: normSube ile
+   karşılaştırma, Türkçe karakter/boşluk duyarsız). */
+let KZ_BY_CH_MON = new Map();   // "normalize(pazaryeri)|YYYY-MM" -> {jen,pos,tel}
+async function loadKarZararTotals(){
+  const sb = window.__SB__; if(!sb) return;
+  try{
+    const { data, error } = await sb.from('kar_zarar').select('*');
+    if(error || !data) return;
+    const m=new Map();
+    for(const r of data){
+      if(r['yıl']==null || r.ay==null || !r.pazaryeri) continue;
+      const k=normSube(r.pazaryeri)+'|'+String(r['yıl'])+'-'+String(r.ay).padStart(2,'0');
+      const cur=m.get(k)||{jen:0,pos:0,tel:0};
+      cur.jen+=(+r.jen_gideri||0); cur.pos+=(+r.pos_gider||0); cur.tel+=(+r.tel_kasa_gelir||0);
+      m.set(k,cur);
+    }
+    KZ_BY_CH_MON=m;
+    render();
+  }catch(e){ /* sessiz geç — Jeneratör/POS/Tel kasa kolonları boş kalır */ }
+}
+loadKarZararTotals();
 function otoAutoVal(dim,row,mon){
   if(dim==='store'){ const k=normSube(row)+'|'+mon; if(YAKIT_BY_STORE_MON.has(k)) return YAKIT_BY_STORE_MON.get(k); }
   if(dim==='ch'){ const k=normSube(row)+'|'+mon; if(YAKIT_BY_CH_MON.has(k)) return YAKIT_BY_CH_MON.get(k); }
@@ -466,31 +505,34 @@ function panel(title, sub, node, opts){
   return p;
 }
 
-/* ---------- grafiği e-posta ile gönder (yerel servis: _kaynak/mail-service.js) ---------- */
+/* ---------- grafiği e-posta ile gönder ----------
+   Market Fiyatları uygulamasındaki aynı mantık: birincil yol gerçek gönderim
+   (yerel _kaynak/mail-service.js → Gmail SMTP, resim hem gövdeye gömülü hem ek
+   olarak gider); o servis kapalıysa/başarısızsa panoya kopyala + mailto:
+   taslağı + sürüklenebilir/indirilebilir önizlemeye düşer. Görsel SVG değil,
+   html2canvas ile PANELİN EKRANDAKİ BİREBİR görüntüsü olarak yakalanır — üstteki
+   not/liste metinleri de dahil olsun diye (yalnız SVG'yi almak bunları atlıyordu). */
 const MAIL_SVC='http://localhost:8788';
-function panelSvgToPng(panelEl){
+function panelToPng(panelEl){
   return new Promise((resolve,reject)=>{
-    const svg=panelEl.querySelector('svg');
-    if(!svg){ reject(new Error('grafik (svg) bulunamadı')); return; }
-    const vb=(svg.getAttribute('viewBox')||'').split(/[\s,]+/).map(Number);
-    const w=Math.round(vb[2]||svg.clientWidth||800), h=Math.round(vb[3]||svg.clientHeight||400);
-    const clone=svg.cloneNode(true);
-    clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
-    clone.setAttribute('width',w); clone.setAttribute('height',h);
-    clone.setAttribute('font-family','"IBM Plex Sans",system-ui,sans-serif');
-    const xml=new XMLSerializer().serializeToString(clone);
+    if(!window.html2canvas){ reject(new Error('html2canvas yüklenemedi')); return; }
+    const clone=panelEl.cloneNode(true);
+    clone.querySelectorAll('.pmail').forEach(el=>el.remove());
+    const rect=panelEl.getBoundingClientRect();
+    clone.style.position='fixed'; clone.style.top='-10000px'; clone.style.left='0';
+    clone.style.width=Math.round(rect.width)+'px'; clone.style.margin='0';
+    document.body.appendChild(clone);
     const bg=getComputedStyle(panelEl).backgroundColor||'#ffffff';
-    const img=new Image();
-    img.onload=()=>{
-      const sc=2, c=document.createElement('canvas'); c.width=w*sc; c.height=h*sc;
-      const ctx=c.getContext('2d'); ctx.scale(sc,sc);
-      ctx.fillStyle=bg; ctx.fillRect(0,0,w,h);
-      ctx.drawImage(img,0,0,w,h);
-      try{ resolve(c.toDataURL('image/png')); }catch(e){ reject(e); }
-    };
-    img.onerror=()=>reject(new Error('grafik görsele çevrilemedi'));
-    img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(xml);
+    window.html2canvas(clone,{backgroundColor:bg,scale:2,useCORS:true})
+      .then(canvas=>{ clone.remove(); resolve(canvas.toDataURL('image/png')); })
+      .catch(e=>{ clone.remove(); reject(e); });
   });
+}
+/** dataURL (data:image/png;base64,...) → tarayıcı panosuna görsel olarak kopyalar. */
+async function copyPngToClipboard(dataUrl){
+  if(!navigator.clipboard || typeof ClipboardItem==='undefined') throw new Error('Bu tarayıcı panoya görsel kopyalamayı desteklemiyor');
+  const blob=await (await fetch(dataUrl)).blob();
+  await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
 }
 function mailBar(panelEl, title){
   const bar=document.createElement('div'); bar.className='pmail';
@@ -500,21 +542,41 @@ function mailBar(panelEl, title){
     `<span class="pmail-msg"></span>`;
   const inp=bar.querySelector('.pmail-in'), btn=bar.querySelector('.pmail-btn'), msg=bar.querySelector('.pmail-msg');
   const setMsg=(t,cls)=>{ msg.textContent=t; msg.className='pmail-msg'+(cls?' '+cls:''); };
+  let preview=null;
+  // Sunucu (mail-service.js) başarısız/kapalıysa: panoya kopyala + mailto taslağı + sürüklenebilir önizleme.
+  function yedekAc(to,konu,ozet,png){
+    let kopyalandi=false;
+    copyPngToClipboard(png).then(()=>{ kopyalandi=true; }).catch(()=>{}).finally(()=>{
+      const govde=ozet+'\n\n(Grafiği bu e-postaya eklemek için: az önce açılan sayfadaki küçük resmi taslağa sürükleyin, veya indirip ekleyin.)';
+      location.href='mailto:'+to+'?subject='+encodeURIComponent(konu)+'&body='+encodeURIComponent(govde);
+      if(preview) preview.remove();
+      preview=document.createElement('div'); preview.className='pmail-preview';
+      preview.innerHTML=`<img class="pmail-thumb" src="${png}" draggable="true" alt="grafik" title="Bu resmi sürükleyip e-posta taslağına bırakın">`+
+        `<span class="hint">↑ resmi taslağa sürükleyin</span>`+
+        `<a href="${png}" download="grafik.png">veya indirip ekleyin</a>`;
+      bar.appendChild(preview);
+      setMsg('E-posta açıldı (yerel gönderim servisi kapalı)','err');
+    });
+  }
   btn.onclick=async()=>{
     const to=(inp.value||'').trim();
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){ setMsg('Geçerli bir e-posta girin','err'); inp.focus(); return; }
     setMsg('Hazırlanıyor…'); btn.disabled=true;
+    if(preview){ preview.remove(); preview=null; }
     try{
-      const png=await panelSvgToPng(panelEl);
+      const png=await panelToPng(panelEl);
       const extra=(panelEl.querySelector('.heat-note')||panelEl.querySelector('.sub'));
       const ozet=title+(extra?' — '+extra.textContent.replace(/\s+/g,' ').trim():'')+
         (fullRange()?' · tüm veri':' · '+F.d(S.from)+' – '+F.d(S.to));
-      const r=await fetch(MAIL_SVC+'/gonder',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({to,konu:'E-Ticaret Analizleri — '+title,png,ozet})});
-      const j=await r.json().catch(()=>({ok:false,hata:'yanıt okunamadı'}));
-      if(j.ok) setMsg('Gönderildi ✓','ok'); else setMsg(j.hata||'Gönderilemedi','err');
+      const konu='E-Ticaret Analizleri — '+title;
+      try{
+        const r=await fetch(MAIL_SVC+'/gonder',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({to,konu,png,ozet})});
+        const j=await r.json().catch(()=>({ok:false}));
+        if(j.ok) setMsg('Gönderildi ✓','ok'); else yedekAc(to,konu,ozet,png);
+      }catch(e){ yedekAc(to,konu,ozet,png); }
     }catch(e){
-      setMsg('Yerel servis kapalı — çalıştırın: node _kaynak/mail-service.js','err');
+      setMsg('Grafik hazırlanamadı: '+e.message,'err');
     }finally{ btn.disabled=false; }
   };
   inp.addEventListener('keydown',e=>{ if(e.key==='Enter') btn.click(); });
@@ -1070,9 +1132,14 @@ function finRows(O, dim, enfDahil){
     .map(r=>{ const oto=otoGet(dim,r.rv,r.mon), otoAuto=otoIsAuto(dim,r.rv,r.mon),
         pers=persGet(dim,r.rv,r.mon), persAuto=persIsAuto(dim,r.rv,r.mon),
         other=giderGet(dim,r.rv,r.mon),
-        gid=r.kom+oto+pers+other, enf=TUFE[r.mon];
+        // Jeneratör/POS/Tel kasa (kar_zarar) — kolonu pazaryeri bazlı; yalnız
+        // 'ch' (pazaryeri) tablosunda o pazaryeri × ay ile birebir eşleşir.
+        // Mağaza tablosunda karşılık gelen veri olmadığından 0 kalır.
+        kzExtra=dim==='ch' ? KZ_BY_CH_MON.get(normSube(r.rv)+'|'+r.mon) : null,
+        jen=kzExtra?kzExtra.jen:0, pos=kzExtra?kzExtra.pos:0, tel=kzExtra?kzExtra.tel:0,
+        gid=r.kom+oto+pers+other+jen+pos, enf=TUFE[r.mon];
       const enfAdj = (enfDahil && enf!=null) ? r.ciro*enf/100 : 0;
-      return {...r, oto, otoAuto, pers, persAuto, other, gid, enf, enfAdj, kz:r.ciro-r.smm-gid-enfAdj}; })
+      return {...r, oto, otoAuto, pers, persAuto, other, jen, pos, tel, gid, enf, enfAdj, kz:r.ciro-r.smm-gid-enfAdj+tel}; })
     .sort((a,b)=> ord.indexOf(a.rv)-ord.indexOf(b.rv) || (a.mon<b.mon?1:a.mon>b.mon?-1:0));
 }
 function finTable(O, dim, label, enfDahil, storeFilter){
@@ -1080,12 +1147,17 @@ function finTable(O, dim, label, enfDahil, storeFilter){
   if(dim==='store' && storeFilter) rows=rows.filter(r=>r.rv===storeFilter);
   const w=document.createElement('div');
   if(!rows.length){ w.className='miss'; w.textContent='Veri yok'; return w; }
-  const T=rows.reduce((a,r)=>{ a.ciro+=r.ciro;a.smm+=r.smm;a.kom+=r.kom;a.oto+=r.oto;a.pers+=r.pers;a.other+=r.other;a.gid+=r.gid;a.kz+=r.kz; return a; },
-                      {ciro:0,smm:0,kom:0,oto:0,pers:0,other:0,gid:0,kz:0});
+  const T=rows.reduce((a,r)=>{ a.ciro+=r.ciro;a.smm+=r.smm;a.kom+=r.kom;a.oto+=r.oto;a.pers+=r.pers;a.other+=r.other;a.jen+=r.jen;a.pos+=r.pos;a.tel+=r.tel;a.gid+=r.gid;a.kz+=r.kz; return a; },
+                      {ciro:0,smm:0,kom:0,oto:0,pers:0,other:0,jen:0,pos:0,tel:0,gid:0,kz:0});
   const kzc=x=> x>=0?'color:var(--good)':'color:var(--crit)';
+  const kzCols=dim==='ch';   // Jeneratör/POS/Tel kasa: yalnız pazaryeri tablosunda (kar_zarar.pazaryeri ile eşleşir)
   let h=`<div class="tbl-scroll"><table class="dt fin"><thead><tr>`+
     `<th>${esc(label)}</th><th>Ay</th><th>Ciro</th><th>SMM</th><th>Komisyon</th>`+
-    `<th>Oto masrafı</th><th>Personel masrafı</th><th>Diğer gider</th><th>Giderler</th><th>Enf. %</th><th>Kâr / Zarar</th></tr></thead><tbody>`;
+    `<th>Oto masrafı</th><th>Personel masrafı</th><th>Diğer gider</th>`+
+    (kzCols?`<th>Jeneratör Gideri</th><th>POS Gideri</th>`:'')+
+    `<th>Giderler</th>`+
+    (kzCols?`<th>Tel Kasa Geliri</th>`:'')+
+    `<th>Enf. %</th><th>Kâr / Zarar</th></tr></thead><tbody>`;
   let prev=null;
   rows.forEach(r=>{
     const first = r.rv!==prev; prev=r.rv;
@@ -1098,7 +1170,9 @@ function finTable(O, dim, label, enfDahil, storeFilter){
       `<td class="num"><input class="fin-oto" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.oto?esc(F.n(r.oto)):''}" placeholder="0"${r.otoAuto?' readonly title="Petrol Ofisi\'nden otomatik (yakitlar tablosu)"':''}></td>`+
       `<td class="num"><input class="fin-pers" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.pers?esc(F.n(r.pers)):''}" placeholder="0"${r.persAuto?' readonly title="Araçlar > Maaş toplamından otomatik"':''}></td>`+
       `<td class="num"><input class="fin-gider" inputmode="decimal" data-rv="${esc(r.rv)}" data-mon="${r.mon}" value="${r.other?esc(F.n(r.other)):''}" placeholder="0"></td>`+
+      (kzCols?`<td class="num">${r.jen?esc(F.tl(r.jen)):'—'}</td><td class="num">${r.pos?esc(F.tl(r.pos)):'—'}</td>`:'')+
       `<td class="num">${esc(F.tl(r.gid))}</td>`+
+      (kzCols?`<td class="num">${r.tel?esc(F.tl(r.tel)):'—'}</td>`:'')+
       `<td class="num">${r.enf!=null?esc(F.n1(r.enf))+'%'+(r.enfAdj>0?' <span class="fin-enfon" title="Kâr/Zarardan düşüldü">↓</span>':''):'—'}</td>`+
       `<td class="num" style="${kzc(r.kz)};font-weight:700">${esc(F.tl(r.kz))}</td></tr>`;
   });
@@ -1107,7 +1181,10 @@ function finTable(O, dim, label, enfDahil, storeFilter){
     `<td class="num">${esc(F.tl(T.kom))}</td><td class="num">${esc(F.tl(T.oto))}</td>`+
     `<td class="num">${esc(F.tl(T.pers))}</td>`+
     `<td class="num">${esc(F.tl(T.other))}</td>`+
-    `<td class="num">${esc(F.tl(T.gid))}</td><td class="num">—</td>`+
+    (kzCols?`<td class="num">${esc(F.tl(T.jen))}</td><td class="num">${esc(F.tl(T.pos))}</td>`:'')+
+    `<td class="num">${esc(F.tl(T.gid))}</td>`+
+    (kzCols?`<td class="num">${esc(F.tl(T.tel))}</td>`:'')+
+    `<td class="num">—</td>`+
     `<td class="num" style="${kzc(T.kz)};font-weight:800">${esc(F.tl(T.kz))}</td></tr></tfoot></table></div>`;
   w.innerHTML=h;
   w.querySelectorAll('input.fin-gider').forEach(inp=>{
@@ -1124,7 +1201,104 @@ function finTable(O, dim, label, enfDahil, storeFilter){
   });
   return w;
 }
+/* ---- Kâr/Zarar ek kayıt: jeneratör gideri, POS gideri, tel kasa geliri — public.kar_zarar (canlı Supabase) ---- */
+function renderKarZararForm(v, sb){
+  const panelEl=panel('Kâr / Zarar — Ek Kayıt','Jeneratör gideri, POS gideri, telefon kasa geliri — aylık elle kayıt (public.kar_zarar)');
+  const curYear=+CURMON.slice(0,4), curMonth=+CURMON.slice(5,7);
+  const AY_TAM={1:'Ocak',2:'Şubat',3:'Mart',4:'Nisan',5:'Mayıs',6:'Haziran',7:'Temmuz',8:'Ağustos',9:'Eylül',10:'Ekim',11:'Kasım',12:'Aralık'};
+  panelEl.insertAdjacentHTML('beforeend', `
+    <form id="kzForm" class="oto-form">
+      <label>Pazaryeri<select name="pazaryeri" required>${CH.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></label>
+      <label>Yıl<input type="number" name="yil" min="2000" max="2100" value="${curYear}" required></label>
+      <label>Ay<select name="ay" required>${range(1,12).map(m=>`<option value="${m}"${m===curMonth?' selected':''}>${esc(AY_TAM[m])}</option>`).join('')}</select></label>
+      <label>Jeneratör Gideri<input type="number" step="0.01" min="0" name="jen_gideri" placeholder="₺"></label>
+      <label>POS Gideri<input type="number" step="0.01" min="0" name="pos_gider" placeholder="₺"></label>
+      <label>Tel Kasa Geliri<input type="number" step="0.01" min="0" name="tel_kasa_gelir" placeholder="₺"></label>
+      <button type="submit" class="tb-btn act">+ Ekle</button>
+    </form>`);
+  const listHost=document.createElement('div'); listHost.id='kzList'; listHost.style.marginTop='12px'; listHost.textContent='Yükleniyor…';
+  panelEl.appendChild(listHost);
+  v.appendChild(panelEl);
+
+  let editingId=null;
+  const monLbl=r=>esc(F.mon(r['yıl']+'-'+String(r.ay).padStart(2,'0')));
+  function viewRow(r){
+    return `<tr data-id="${r.id}">`+
+      `<td>${esc(r.pazaryeri||'—')}</td>`+
+      `<td>${monLbl(r)}</td>`+
+      `<td class="num">${r.jen_gideri!=null?esc(F.tl(r.jen_gideri)):'—'}</td>`+
+      `<td class="num">${r.pos_gider!=null?esc(F.tl(r.pos_gider)):'—'}</td>`+
+      `<td class="num">${r.tel_kasa_gelir!=null?esc(F.tl(r.tel_kasa_gelir)):'—'}</td>`+
+      `<td class="num">`+
+      `<button type="button" class="oto-edit tb-btn" data-id="${r.id}" title="Düzenle">✎</button> `+
+      `<button type="button" class="oto-del" data-id="${r.id}" title="Sil">✕</button>`+
+      `</td></tr>`;
+  }
+  function editRow(r){
+    return `<tr data-id="${r.id}" class="oto-editrow">`+
+      `<td><select class="kz-paz">${CH.map(c=>`<option value="${esc(c)}"${c===r.pazaryeri?' selected':''}>${esc(c)}</option>`).join('')}</select></td>`+
+      `<td>${monLbl(r)}</td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="kz-jen" value="${r.jen_gideri!=null?r.jen_gideri:''}"></td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="kz-pos" value="${r.pos_gider!=null?r.pos_gider:''}"></td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="kz-tel" value="${r.tel_kasa_gelir!=null?r.tel_kasa_gelir:''}"></td>`+
+      `<td class="num">`+
+      `<button type="button" class="oto-save tb-btn act" data-id="${r.id}" title="Kaydet">✓</button> `+
+      `<button type="button" class="oto-cancel tb-btn" data-id="${r.id}" title="Vazgeç">✕</button>`+
+      `</td></tr>`;
+  }
+  function renderList(rows){
+    if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz kayıt yok</div>'; return; }
+    let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
+      `<th>Pazaryeri</th><th>Dönem</th><th>Jeneratör Gideri</th><th>POS Gideri</th><th>Tel Kasa Geliri</th><th></th></tr></thead><tbody>`;
+    rows.forEach(r=>{ h+= (String(r.id)===String(editingId)) ? editRow(r) : viewRow(r); });
+    h+='</tbody></table></div>';
+    listHost.innerHTML=h;
+
+    listHost.querySelectorAll('.oto-del').forEach(b=> b.onclick=async()=>{
+      if(!confirm('Bu kaydı silmek istiyor musunuz?')) return;
+      b.disabled=true;
+      const { error }=await sb.from('kar_zarar').delete().eq('id',b.dataset.id);
+      if(error){ alert('Silinemedi: '+error.message); b.disabled=false; return; }
+      refresh(); loadKarZararTotals();
+    });
+    listHost.querySelectorAll('.oto-edit').forEach(b=> b.onclick=()=>{ editingId=b.dataset.id; renderList(rows); });
+    listHost.querySelectorAll('.oto-cancel').forEach(b=> b.onclick=()=>{ editingId=null; renderList(rows); });
+    listHost.querySelectorAll('.oto-save').forEach(b=> b.onclick=async()=>{
+      const tr=b.closest('tr');
+      const val=cls=>{ const x=tr.querySelector('.'+cls).value; return x===''?null:Number(x); };
+      const row={ pazaryeri:tr.querySelector('.kz-paz').value, jen_gideri:val('kz-jen'), pos_gider:val('kz-pos'), tel_kasa_gelir:val('kz-tel') };
+      b.disabled=true;
+      const { error }=await sb.from('kar_zarar').update(row).eq('id', b.dataset.id);
+      if(error){ alert('Kaydedilemedi: '+error.message); b.disabled=false; return; }
+      editingId=null;
+      refresh(); loadKarZararTotals();
+    });
+  }
+  async function refresh(){
+    listHost.textContent='Yükleniyor…';
+    const { data, error }=await sb.from('kar_zarar').select('*').order('yıl',{ascending:false}).order('ay',{ascending:false});
+    if(error){ listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(error.message)+'</div>'; return; }
+    renderList(data||[]);
+  }
+  panelEl.querySelector('#kzForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const f=e.target;
+    const num=n=>{ const x=f.elements[n].value; return x===''?null:Number(x); };
+    const row={ pazaryeri:f.elements.pazaryeri.value, 'yıl':Number(f.elements.yil.value), ay:Number(f.elements.ay.value),
+      jen_gideri:num('jen_gideri'), pos_gider:num('pos_gider'), tel_kasa_gelir:num('tel_kasa_gelir') };
+    const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
+    const { error }=await sb.from('kar_zarar').insert(row);
+    btn.disabled=false;
+    if(error){ alert('Eklenemedi: '+error.message); return; }
+    f.reset();
+    f.elements.yil.value=curYear;
+    refresh(); loadKarZararTotals();
+  });
+  refresh();
+}
 RENDERERS.final=(v)=>{
+  const sb=window.__SB__;
+  if(sb) renderKarZararForm(v, sb);
   const O=fO();
   const enfDahil=enfGet();
   const R=finRows(O,'ch',enfDahil);
@@ -1132,7 +1306,7 @@ RENDERERS.final=(v)=>{
   v.appendChild(kpirow(
     kpi('Ciro (teslim edilen)',F.tl(T.ciro),F.mon(PL.meta.minDate)+' →')+
     kpi('SMM',F.tl(T.smm),'Ticimax ×0,80 · YS/Trendyol ×0,65')+
-    kpi('Giderler',F.tl(T.gid),'komisyon + oto + personel + diğer gider')+
+    kpi('Giderler',F.tl(T.gid),'komisyon + oto + personel + diğer gider + jeneratör + POS')+
     kpi('Kâr / Zarar',F.tl(T.kz), T.kz>=0?'kâr':'zarar', T.kz>=0?'up':'down')
   ));
   const tog=document.createElement('div'); tog.className='fin-enftog';
@@ -1142,13 +1316,6 @@ RENDERERS.final=(v)=>{
     `<span class="fin-src">Enf. % kaynağı: TÜİK TÜFE — ${TUFE_FOOD?'gıda sektörü ('+esc(TUFE_SERIES)+')':'genel (gıda verisi henüz yok)'}</span>`;
   tog.querySelectorAll('.fin-tb').forEach(b=> b.onclick=()=>{ enfSet(b.dataset.v==='1'); render(); });
   v.appendChild(tog);
-  const nt=document.createElement('div'); nt.className='note';
-  nt.innerHTML='<b>SMM</b> = ciro × (1 − dilim). Dilim: Ticimax %20 → ×0,80, Yemeksepeti %35 → ×0,65, Trendyol %35 → ×0,65. '+
-    '<b>Komisyon</b> API’lerden gelir. <b>Oto masrafı</b> (yakıt) ve <b>Personel masrafı</b> (maaş) otomatik doldurulup salt-okunur olur: mağaza tablosunda araç şubesine göre; pazaryeri tablosunda ise sırasıyla [Araçlar > Araç Kaynağı] ve [Araçlar > Personel Kaynağı] alanlarındaki pazaryeri ad(lar)ına göre — alanda tek pazaryeri varsa tutarın tamamı, virgülle ayrılmış birden çoksa payına düşen kadarı o pazaryeri satırına yazılır. Veri/eşleşme olmayan hücrelerde elle girip <b>Enter</b>. <b>Diğer gider</b> her zaman elle girilir, <b>Enter</b> ile kaydedilir — bu tarayıcıda saklanır. '+
-    '<b>Kâr / Zarar</b> = Ciro − SMM − (Komisyon + Oto masrafı + Personel masrafı + Diğer gider)'+(enfDahil?' − (Ciro × Enf. %)':'')+'. '+
-    '<b>Enf. %</b> aylık TÜİK TÜFE — [E]/[H] ile kâr/zarara dahil edilip edilmeyeceğini seçin (varsayılan: hayır, yalnız bilgi). '+
-    '<span class="fin-open" style="margin-left:2px">ay kapanmadı</span> içinde bulunduğumuz ay için — rakamlar henüz kesinleşmedi.';
-  v.appendChild(nt);
   v.appendChild(panel('Pazaryerine göre — aylık kâr / zarar','Satır: pazaryeri × ay (en yeni ay üstte)', finTable(O,'ch','Pazaryeri',enfDahil)));
 
   // Mağaza × ay — mağaza sayısı fazla olduğundan filtre
