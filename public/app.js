@@ -20,16 +20,22 @@ const TUFE = (window.__TUFE__ && window.__TUFE__.monthly) || {};
 const _manKey = (field,dim,row,mon) => `eta.final.${field}.${dim}.${row}.${mon}`;
 function manGet(field,dim,row,mon){ try{ return +localStorage.getItem(_manKey(field,dim,row,mon))||0; }catch(e){ return 0; } }
 function manSet(field,dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_manKey(field,dim,row,mon),String(val)) : localStorage.removeItem(_manKey(field,dim,row,mon)); }catch(e){} }
-/* Oto masrafı (yakıt) ve Personel masrafı (maaş) — public.yakitlar / araclar'dan
-   otomatik doldurulur:
-     - Mağazaya göre tablo : araclar.sube eşleşmesi (harf/Türkçe karakter duyarsız).
-     - Pazaryerine göre tablo: araclar.arac_kaynak (yakıt) / araclar.pers_kaynak
-       (personel) alanındaki, VİRGÜLLE AYRILMIŞ pazaryeri adları (Ticimax,
-       Yemeksepeti, Trendyol) esas alınır. Tek pazaryeri yazılıysa tutarın
-       tamamı ona; birden çoksa tutar EŞİT değil, pazaryerlerinin CİROSUNA
-       ORANTILI paylaştırılır (chCiro ile) — ciro verisi yoksa (hepsi 0)
-       eşit paylaşıma düşülür. Eşleşme yoksa (alan boş/tanınmayan) o araç
-       pazaryeri tablosuna dahil edilmez.
+/* Oto masrafı (yakıt) ve Personel masrafı — public.yakitlar/araclar ve
+   public.personel'den otomatik doldurulur:
+     - Mağazaya göre tablo, Oto masrafı : araclar.sube eşleşmesi (harf/Türkçe
+       karakter duyarsız).
+     - Mağazaya göre tablo, Personel masrafı : public.personel — unvanı
+       "Reyoner" içeren kayıtların bölüm alanı mağaza adına eşleştirilir, ay
+       bazında (maaş+SGK primi+gelir vergisi+damga vergisi toplamı).
+     - Pazaryerine göre tablo, Oto masrafı: araclar.arac_kaynak alanındaki,
+       VİRGÜLLE AYRILMIŞ pazaryeri adları (Ticimax, Yemeksepeti, Trendyol)
+       esas alınır. Tek pazaryeri yazılıysa tutarın tamamı ona; birden çoksa
+       tutar EŞİT değil, pazaryerlerinin CİROSUNA ORANTILI paylaştırılır
+       (chCiro ile) — ciro verisi yoksa (hepsi 0) eşit paylaşıma düşülür.
+       Eşleşme yoksa (alan boş/tanınmayan) o araç pazaryeri tablosuna dahil
+       edilmez. Pazaryerine göre tabloda Personel masrafı için otomatik
+       kaynak YOK (araclar'dan personel/maaş alanları kaldırıldı) — elle
+       girilir.
    Senkron/hesaplanan veri olan hücreler salt-okunur olur; olmayanlarda elle
    giriş eskisi gibi çalışmaya devam eder. */
 const normSube = (s) => String(s||'').trim().toLocaleLowerCase('tr-TR');
@@ -59,8 +65,7 @@ function ciroOrantiliPay(tutar, pazaryerleri, mon){
 
 let YAKIT_BY_STORE_MON = new Map();   // "normalize(mağaza)|YYYY-MM" -> tutar
 let YAKIT_BY_CH_MON = new Map();      // "normalize(pazaryeri)|YYYY-MM" -> tutar (arac_kaynak'a göre paylaştırılmış)
-let PERS_BY_STORE = new Map();        // "normalize(mağaza)" -> toplam maaş (her ay aynı, sabit gider)
-let PERS_BY_CH = new Map();           // "normalize(pazaryeri)" -> toplam maaş (pers_kaynak'a göre paylaştırılmış)
+let PERSONEL_BY_STORE_MON = new Map(); // "normalize(mağaza)|YYYY-MM" -> Reyoner personel masrafı toplamı (aylık)
 (async function loadYakitTotals(){
   const sb = window.__SB__; if(!sb) return;
   try{
@@ -79,23 +84,33 @@ let PERS_BY_CH = new Map();           // "normalize(pazaryeri)" -> toplam maaş 
     render();
   }catch(e){ /* sessiz geç — Oto masrafı elle girilmiş haliyle kalır */ }
 })();
-(async function loadMaasTotals(){
+/* Personel masrafı (Reyoner) — public.personel'den, mağazaya göre aylık
+   kâr/zarar tablosuna: unvanı "Reyoner" içeren personelin bölümü mağaza adına
+   eşleştirilir (araclar/yakitlar deseniyle aynı: normSube/resolveSube ile
+   karşılaştırma), maaş+SGK primi+gelir vergisi+damga vergisi toplamı o
+   mağaza + o ay (yıl/ay) için toplanır. (araclar tablosundan personel/maaş
+   alanları kaldırıldı — personel masrafı artık yalnız bu kaynaktan gelir;
+   pazaryerine göre tabloda otomatik Personel masrafı kaynağı YOK, elle
+   girilir.) */
+async function loadPersonelTotals(){
   const sb = window.__SB__; if(!sb) return;
   try{
-    const { data, error } = await sb.from('araclar').select('sube,pers_kaynak,maas');
+    const { data, error } = await sb.from('personel').select('bolum,unvan,yil,ay,maas,sgk_prim,g_vergi,d_vergi');
     if(error || !data) return;
-    for(const a of data){
-      const maas=+a.maas||0; if(!maas) continue;
-      if(a.sube){ const k=resolveSube(a.sube); PERS_BY_STORE.set(k,(PERS_BY_STORE.get(k)||0)+maas); }
-      const pazaryerleri=splitPazaryerleri(a.pers_kaynak);
-      if(pazaryerleri.length){
-        const paylar=ciroOrantiliPay(maas,pazaryerleri,null);
-        pazaryerleri.forEach((p,i)=>{ PERS_BY_CH.set(p,(PERS_BY_CH.get(p)||0)+paylar[i]); });
-      }
+    const m=new Map();
+    for(const r of data){
+      if(!/reyoner/i.test(String(r.unvan||''))) continue;
+      if(r.yil==null || r.ay==null || !r.bolum) continue;
+      const mon=String(r.yil)+'-'+String(r.ay).padStart(2,'0');
+      const masraf=(+r.maas||0)+(+r.sgk_prim||0)+(+r.g_vergi||0)+(+r.d_vergi||0);
+      const k=resolveSube(r.bolum)+'|'+mon;
+      m.set(k,(m.get(k)||0)+masraf);
     }
+    PERSONEL_BY_STORE_MON=m;
     render();
-  }catch(e){ /* sessiz geç — Personel masrafı elle girilmiş haliyle kalır */ }
-})();
+  }catch(e){ /* sessiz geç — Personel masrafı (Mağazaya göre tablo) boş kalır */ }
+}
+loadPersonelTotals();
 /* Jeneratör gideri / POS gideri / Tel kasa geliri — public.kar_zarar'dan
    (pazaryeri × ay bazlı). Kâr/Zarar > Pazaryerine göre tablosunda o pazaryeri +
    o ay ile birebir eşleşir (araclar/yakitlar deseniyle aynı: normSube ile
@@ -127,13 +142,15 @@ function otoAutoVal(dim,row,mon){
 const otoGet=(dim,row,mon)=>{ const a=otoAutoVal(dim,row,mon); return a!=null ? a : manGet('oto',dim,row,mon); };
 const otoIsAuto=(dim,row,mon)=>otoAutoVal(dim,row,mon)!=null;
 const otoSet=(dim,row,mon,v)=>manSet('oto',dim,row,mon,v);
-function persAutoVal(dim,row){
-  if(dim==='store'){ const k=normSube(row); if(PERS_BY_STORE.has(k)) return PERS_BY_STORE.get(k); }
-  if(dim==='ch'){ const k=normSube(row); if(PERS_BY_CH.has(k)) return PERS_BY_CH.get(k); }
+function persAutoVal(dim,row,mon){
+  if(dim==='store'){
+    const monKey=mon!=null ? (normSube(row)+'|'+mon) : null;
+    if(monKey && PERSONEL_BY_STORE_MON.has(monKey)) return PERSONEL_BY_STORE_MON.get(monKey);
+  }
   return null;
 }
-const persGet=(dim,row,mon)=>{ const a=persAutoVal(dim,row); return a!=null ? a : manGet('pers',dim,row,mon); };
-const persIsAuto=(dim,row,mon)=>persAutoVal(dim,row)!=null;
+const persGet=(dim,row,mon)=>{ const a=persAutoVal(dim,row,mon); return a!=null ? a : manGet('pers',dim,row,mon); };
+const persIsAuto=(dim,row,mon)=>persAutoVal(dim,row,mon)!=null;
 const persSet=(dim,row,mon,v)=>manSet('pers',dim,row,mon,v);
 const giderGet=(dim,row,mon)=>manGet('gider',dim,row,mon), giderSet=(dim,row,mon,v)=>manSet('gider',dim,row,mon,v);
 /* Enflasyonu Kâr/Zarar'a dahil et mi? [E]/[H] — global, tarayıcıda saklanır */
@@ -1334,9 +1351,9 @@ RENDERERS.final=(v)=>{
 };
 
 /* ============ E-TİCARET OTOLARI — araçlar + Petrol Ofisi yakıt alımları (canlı Supabase) ============ */
-/* ---- Araçlar: filo listesi (plaka/şube/şoför) — public.araclar ---- */
-/** Araç/Personel Kaynağı (pazaryeri) alanları: serbest metin yerine tıklayarak
-    birden fazla seçilebilen küçük "chip" düğmeleri — değer, seçili chip'lerin
+/* ---- Araçlar: filo listesi (plaka/şube/araç kaynağı) — public.araclar ---- */
+/** Araç Kaynağı (pazaryeri) alanı: serbest metin yerine tıklayarak birden
+    fazla seçilebilen küçük "chip" düğmeleri — değer, seçili chip'lerin
     virgülle birleştirilmiş adı olarak saklanır (eski metin alanlarıyla aynı
     format, geriye dönük uyumlu). selected: "Ticimax, Trendyol" gibi mevcut
     virgüllü değer (düzenleme satırı için). */
@@ -1351,22 +1368,19 @@ function chipValue(container){
   return [...container.querySelectorAll('.chip-btn.on')].map(b=>b.dataset.v).join(', ') || null;
 }
 function renderAraclarPanel(v, sb){
-  const panelEl=panel('Araçlar','Filo listesi — plaka, şube, şoför, araç/personel kaynağı, maaş, yakıt tutarı');
+  const panelEl=panel('Araçlar','Filo listesi — plaka, şube, araç kaynağı, yakıt tutarı');
   panelEl.insertAdjacentHTML('beforeend', `
     <form id="aracForm" class="oto-form">
       <label>Plaka<input type="text" name="plaka" placeholder="07 AB 1234" required style="text-transform:uppercase"></label>
       <label>Şube<input type="text" name="sube" list="aracSubeList" placeholder="Erciyes" autocomplete="off"></label>
       <datalist id="aracSubeList">${DIMS.store.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
-      <label>Şoför<input type="text" name="sofor" placeholder="Ad Soyad"></label>
       <label>Araç Kaynağı<div class="chip-group" id="aracKaynakChips">${chipButtons(CH)}</div></label>
-      <label>Personel Kaynağı<div class="chip-group" id="persKaynakChips">${chipButtons(CH)}</div></label>
-      <label>Maaş<input type="number" step="0.01" min="0" name="maas" placeholder="₺"></label>
       <button type="submit" class="tb-btn act">+ Ekle</button>
       <span class="oto-sep" aria-hidden="true"></span>
       <label class="oto-yakit-ay" title="Yakıt tutarını görüntülemek istediğiniz ay (boş=tümü)">Yakıt Ay<input type="month" id="aracYakitAy"></label>
       <button type="button" id="aracYakitAyAll" class="tb-btn">Tümü</button>
     </form>`);
-  panelEl.querySelectorAll('#aracKaynakChips, #persKaynakChips').forEach(wireChips);
+  panelEl.querySelectorAll('#aracKaynakChips').forEach(wireChips);
   const listHost=document.createElement('div'); listHost.id='aracList'; listHost.textContent='Yükleniyor…';
   panelEl.appendChild(listHost);
   v.appendChild(panelEl);
@@ -1379,9 +1393,8 @@ function renderAraclarPanel(v, sb){
 
   function viewRow(r){
     return `<tr data-id="${r.id}">`+
-      `<td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td><td>${esc(r.sofor||'')}</td>`+
-      `<td>${esc(r.arac_kaynak||'')}</td><td>${esc(r.pers_kaynak||'')}</td>`+
-      `<td class="num">${r.maas!=null?esc(F.tl(r.maas)):'—'}</td>`+
+      `<td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td>`+
+      `<td>${esc(r.arac_kaynak||'')}</td>`+
       `<td class="num">${esc(F.tl(r.yakit||0))}</td>`+
       `<td class="num">`+
       `<button type="button" class="oto-edit tb-btn" data-id="${r.id}" title="Düzenle">✎</button> `+
@@ -1392,10 +1405,7 @@ function renderAraclarPanel(v, sb){
     return `<tr data-id="${r.id}" class="oto-editrow">`+
       `<td><input type="text" class="ar-plaka" value="${esc(r.plaka||'')}" style="text-transform:uppercase"></td>`+
       `<td><input type="text" class="ar-sube" list="aracSubeList" value="${esc(r.sube||'')}"></td>`+
-      `<td><input type="text" class="ar-sofor" value="${esc(r.sofor||'')}"></td>`+
       `<td><div class="chip-group ar-arac-kaynak">${chipButtons(CH,r.arac_kaynak)}</div></td>`+
-      `<td><div class="chip-group ar-pers-kaynak">${chipButtons(CH,r.pers_kaynak)}</div></td>`+
-      `<td class="num"><input type="number" step="0.01" min="0" class="ar-maas" value="${r.maas!=null?r.maas:''}"></td>`+
       `<td class="num">${esc(F.tl(r.yakit||0))}</td>`+
       `<td class="num">`+
       `<button type="button" class="oto-save tb-btn act" data-id="${r.id}" title="Kaydet">✓</button> `+
@@ -1406,7 +1416,7 @@ function renderAraclarPanel(v, sb){
     if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz araç kaydı yok</div>'; return; }
     const yakitTh=yakitAy?`Yakıt Tutarı (${esc(F.mon(yakitAy))})`:'Yakıt Tutarı (Tümü)';
     let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
-      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Araç Kaynağı</th><th>Personel Kaynağı</th><th>Maaş</th><th>${yakitTh}</th><th></th></tr></thead><tbody>`;
+      `<th>Plaka</th><th>Şube</th><th>Araç Kaynağı</th><th>${yakitTh}</th><th></th></tr></thead><tbody>`;
     rows.forEach(r=>{ h+= (String(r.id)===String(editingId)) ? editRow(r) : viewRow(r); });
     h+='</tbody></table></div>';
     listHost.innerHTML=h;
@@ -1426,10 +1436,7 @@ function renderAraclarPanel(v, sb){
       const val=cls=>{ const x=tr.querySelector('.'+cls).value.trim(); return x===''?null:x; };
       const plaka=String(val('ar-plaka')||'').toUpperCase();
       if(!plaka){ alert('Plaka gerekli.'); return; }
-      const maasRaw=tr.querySelector('.ar-maas').value;
-      const row={ plaka, sube:val('ar-sube'), sofor:val('ar-sofor'),
-        arac_kaynak:chipValue(tr.querySelector('.ar-arac-kaynak')), pers_kaynak:chipValue(tr.querySelector('.ar-pers-kaynak')),
-        maas: maasRaw===''?null:Number(maasRaw) };
+      const row={ plaka, sube:val('ar-sube'), arac_kaynak:chipValue(tr.querySelector('.ar-arac-kaynak')) };
       b.disabled=true;
       const { error }=await sb.from('araclar').update(row).eq('id', b.dataset.id);
       if(error){ alert('Kaydedilemedi: '+error.message); b.disabled=false; return; }
@@ -1458,10 +1465,7 @@ function renderAraclarPanel(v, sb){
     const val=n=>{ const x=f.elements[n].value; return x===''?null:x; };
     const plaka=String(val('plaka')||'').trim().toUpperCase();
     if(!plaka){ alert('Plaka gerekli.'); return; }
-    const maasRaw=f.elements.maas.value;
-    const row={ plaka, sube:val('sube'), sofor:val('sofor'),
-      arac_kaynak:chipValue(f.querySelector('#aracKaynakChips')), pers_kaynak:chipValue(f.querySelector('#persKaynakChips')),
-      maas: maasRaw===''?null:Number(maasRaw) };
+    const row={ plaka, sube:val('sube'), arac_kaynak:chipValue(f.querySelector('#aracKaynakChips')) };
     const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
     const { error }=await sb.from('araclar').insert(row);
     btn.disabled=false;

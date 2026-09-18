@@ -113,27 +113,31 @@ create policy "authenticated_all"
   with check (true);
 
 -- ============================================================================
---  ARAÇLAR  —  filo kaydı (plaka, şube, şoför, kullanım amacı)
+--  ARAÇLAR  —  filo kaydı (plaka, şube, araç kaynağı)
 --  ----------------------------------------------------------------------------
 --  "E-Ticaret Otoları" sayfasındaki araç listesi. api/yakit.js bu tablodaki
 --  plakaları arac_takip_sistemi'nden (Petrol Ofisi) çekilen yakıt alımlarıyla
 --  eşleştirmek için service_role ile okur; tarayıcı ise doğrudan (anon anahtar
---  + oturum) okur/yazar — vehicle_logs ile aynı yetki modeli.
+--  + oturum) okur/yazar — vehicle_logs ile aynı yetki modeli. Personel/maaş
+--  bilgisi artık bu tabloda DEĞİL — bkz. public.personel (Reyoner masrafı,
+--  Mağazaya göre kâr/zarar tablosuna oradan gelir).
 -- ============================================================================
 create table if not exists public.araclar (
   id          bigint generated always as identity primary key,
   created_at  timestamptz not null default now(),
   plaka       text        not null,
   sube        text,
-  sofor       text,
-  kullanim    text,
-  kaynak      text,
-  maas        numeric
+  arac_kaynak text
 );
 
--- Onceden olusturulmus tablolarda eksikse eklenir (idempotent).
-alter table public.araclar add column if not exists kaynak text;
-alter table public.araclar add column if not exists maas numeric;
+-- Onceden olusturulmus tablolarda eksikse eklenir / kaldirilmis alanlar
+-- temizlenir (idempotent) — sofor/kullanim/kaynak/pers_kaynak/maas artik yok.
+alter table public.araclar add column if not exists arac_kaynak text;
+alter table public.araclar drop column if exists sofor;
+alter table public.araclar drop column if exists kullanim;
+alter table public.araclar drop column if exists kaynak;
+alter table public.araclar drop column if exists pers_kaynak;
+alter table public.araclar drop column if exists maas;
 
 create index if not exists araclar_plaka_idx on public.araclar (plaka);
 
