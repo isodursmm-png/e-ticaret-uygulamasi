@@ -41,11 +41,12 @@ function manSet(field,dim,row,mon,val){ try{ val>0 ? localStorage.setItem(_manKe
 const normSube = (s) => String(s||'').trim().toLocaleLowerCase('tr-TR');
 /** "Ticimax, Trendyol" -> ['ticimax','trendyol'] (normalize edilmiş, boşlar atılmış). */
 const splitPazaryerleri = (s) => String(s||'').split(',').map(normSube).filter(Boolean);
-/* araclar.sube bazı araçlarda kanonik mağaza adıyla birebir örtüşmüyor
-   (ör. "Alanya Oba" şubesi sipariş verisindeki "Alanya" mağazasına ait) —
-   bilinen istisnalar burada kanonik mağaza adına yönlendirilir. Yeni bir
-   uyumsuzluk görülürse buraya bir satır eklemek yeterli. */
-const SUBE_ALIAS = { 'alanya oba': 'alanya' };
+/* araclar.sube / personel.bolum bazı kayıtlarda kanonik mağaza adıyla birebir
+   örtüşmüyor (ör. "Alanya Oba" şubesi sipariş verisindeki "Alanya" mağazasına,
+   "ETİCARET DEPO" bölümü de "E-Ticaret Deposu" mağazasına ait) — bilinen
+   istisnalar burada kanonik mağaza adına yönlendirilir. Yeni bir uyumsuzluk
+   görülürse buraya bir satır eklemek yeterli. */
+const SUBE_ALIAS = { 'alanya oba': 'alanya', 'eticaret depo': 'e-ticaret deposu' };
 const resolveSube = (s) => { const n=normSube(s); return SUBE_ALIAS[n] || n; };
 /** Bir pazaryerinin (kanalın) teslim edilen cirosu — mon ("YYYY-MM") verilirse
     yalnız o ay, null ise tüm zamanlar. Oto/Personel masrafı birden çok
@@ -1982,15 +1983,25 @@ RENDERERS.matris=(v)=>{
 
 RENDERERS.veri=(v)=>{
   const O=fO();
-  v.appendChild(panel('Filtrelenmiş siparişler', O.length+' kayıt · başlığa tıklayarak sırala',
-    dataTable([
+  const listPanel=panel('Filtrelenmiş siparişler', O.length+' kayıt · başlığa tıklayarak sırala', null);
+  listPanel.insertAdjacentHTML('beforeend',
+    `<div class="fg" style="max-width:460px;margin-bottom:12px"><label>Durum</label><div class="multi" data-key="st">`+
+    DIMS.st.map(s=>`<label><input type="checkbox" value="${esc(s)}" ${S.st.has(s)?'checked':''}>${esc(s)}</label>`).join('')+
+    `</div></div>`);
+  listPanel.querySelector('.multi').addEventListener('change',()=>{
+    S.st.clear();
+    listPanel.querySelectorAll('.multi input:checked').forEach(i=>S.st.add(i.value));
+    buildFilters(); render();
+  });
+  listPanel.appendChild(dataTable([
       {key:'id',label:'Sipariş'},{key:'ch',label:'Kanal'},{key:'ds',label:'Tarih',fmt:x=>esc(F.d(x))},
       {key:'hr',label:'Saat',fmt:x=>x==null?'—':String(x).padStart(2,'0')+':00'},
       {key:'st',label:'Durum'},{key:'store',label:'Mağaza'},{key:'city',label:'İl'},{key:'ilce',label:'İlçe'},
       {key:'src',label:'Kaynak'},{key:'pay',label:'Ödeme'},
       {key:'ciro',label:'Ciro',fmt:F.tl,def:true},{key:'qty',label:'Adet',fmt:F.n},
       {key:'cust',label:'Müşteri',fmt:x=>esc(x||'—')}
-    ], O, {per:25, shade:['ciro']})));
+    ], O, {per:25, shade:['ciro']}));
+  v.appendChild(listPanel);
   const p=panel('Dışa aktar',null,null);
   p.insertAdjacentHTML('beforeend',
     `<div class="sub">CSV indirin (tarayıcı bloklarsa "Metni göster" ile kopyalayın).</div>
