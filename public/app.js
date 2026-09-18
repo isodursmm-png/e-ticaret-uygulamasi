@@ -1984,15 +1984,24 @@ RENDERERS.matris=(v)=>{
 RENDERERS.veri=(v)=>{
   const O=fO();
   const listPanel=panel('Filtrelenmiş siparişler', O.length+' kayıt · başlığa tıklayarak sırala', null);
+  const dd=(key,label,opts,set,size)=>
+    `<div class="fg" style="min-width:170px;flex:1"><label>${esc(label)}</label>`+
+    `<select multiple size="${size}" data-key="${key}">`+
+    opts.map(o=>`<option value="${esc(o)}"${set.has(o)?' selected':''}>${esc(o)}</option>`).join('')+
+    `</select></div>`;
   listPanel.insertAdjacentHTML('beforeend',
-    `<div class="fg" style="max-width:460px;margin-bottom:12px"><label>Durum</label><div class="multi" data-key="st">`+
-    DIMS.st.map(s=>`<label><input type="checkbox" value="${esc(s)}" ${S.st.has(s)?'checked':''}>${esc(s)}</label>`).join('')+
-    `</div></div>`);
-  listPanel.querySelector('.multi').addEventListener('change',()=>{
-    S.st.clear();
-    listPanel.querySelectorAll('.multi input:checked').forEach(i=>S.st.add(i.value));
+    `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">`+
+    dd('ch','Kanal',CH,S.ch,3)+
+    dd('st','Durum',DIMS.st,S.st,4)+
+    dd('store','Mağaza',DIMS.store,S.store,5)+
+    `</div>`);
+  listPanel.querySelectorAll('select[data-key]').forEach(sel=>sel.addEventListener('change',()=>{
+    const key=sel.dataset.key;
+    S[key].clear();
+    [...sel.selectedOptions].forEach(o=>S[key].add(o.value));
+    if(key==='ch' && S.ch.size===0) CH.forEach(c=>S.ch.add(c));
     buildFilters(); render();
-  });
+  }));
   listPanel.appendChild(dataTable([
       {key:'id',label:'Sipariş'},{key:'ch',label:'Kanal'},{key:'ds',label:'Tarih',fmt:x=>esc(F.d(x))},
       {key:'hr',label:'Saat',fmt:x=>x==null?'—':String(x).padStart(2,'0')+':00'},
