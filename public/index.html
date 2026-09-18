@@ -294,7 +294,10 @@ input.fin-oto:focus,input.fin-pers:focus,input.fin-gider:focus{outline:none; bor
 .oto-form{display:flex; flex-wrap:nowrap; gap:7px; align-items:flex-end; overflow-x:auto}
 .oto-form label{display:flex; flex-direction:column; gap:3px; font-size:10.5px; font-weight:600; color:var(--ink-2); flex:1 1 78px; min-width:50px}
 .oto-form label:has(input[name="maas"]){flex-basis:60px}
-.oto-form label:has(.chip-group){flex:2 1 150px}
+.oto-form label:has(.chip-group){flex:2 1 150px; align-items:center; text-align:center; gap:6px;
+  border:1px solid var(--hair-strong); border-radius:10px; padding:6px 9px 8px; background:var(--surface);
+  font-size:11px; font-weight:800; letter-spacing:.02em; color:var(--ink)}
+.oto-form label:has(.chip-group) .chip-group{justify-content:center}
 .oto-form input{font:inherit; font-size:12.5px; font-weight:500; color:var(--ink); background:var(--surface);
   border:1px solid var(--hair-strong); border-radius:7px; padding:6px 8px; width:100%; min-width:0}
 .oto-form input:focus{outline:none; border-color:var(--s8); box-shadow:0 0 0 3px color-mix(in srgb,var(--s8) 25%,transparent)}
