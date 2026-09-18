@@ -1482,11 +1482,27 @@ RENDERERS.otolar=(v)=>{
   renderAraclarPanel(v, sb);
 };
 
-/* ---- Personel: bordro listesi (ad, soyad, unvan, bölüm, maaş, sgk, vergiler) — public.personel (salt okunur) ---- */
+/* ---- Personel: bordro listesi (ad, soyad, unvan, bölüm, maaş, sgk, vergiler) — public.personel ---- */
+const persMasraf=r=>(+r.maas||0)+(+r.sgk_prim||0)+(+r.g_vergi||0)+(+r.d_vergi||0);
 function renderPersonelPanel(v, sb){
-  const panelEl=panel('Personel','E-Ticaret personel bordro listesi — ünvan, bölüm, maaş, SGK primi, vergiler');
+  const panelEl=panel('Personel','E-Ticaret personel bordro listesi — ünvan, bölüm, maaş, SGK primi, vergiler, personel masrafı');
   panelEl.insertAdjacentHTML('beforeend', `
-    <div class="oto-form">
+    <form id="personelForm" class="oto-form">
+      <label>Yıl<input type="number" name="yil" placeholder="2026" required style="width:80px"></label>
+      <label>Ay<input type="number" name="ay" min="1" max="12" placeholder="1-12" required style="width:64px"></label>
+      <label>Ad<input type="text" name="ad" placeholder="Ad" required></label>
+      <label>Soyad<input type="text" name="soyad" placeholder="Soyad" required></label>
+      <label>Ünvan<input type="text" name="unvan" placeholder="Ünvan"></label>
+      <label>Bölüm<input type="text" name="bolum" list="persBolumList" placeholder="Bölüm" autocomplete="off"></label>
+      <datalist id="persBolumList"></datalist>
+      <label>İşe Giriş<input type="date" name="ise_giris_tarihi"></label>
+      <label>Maaş<input type="number" step="0.01" min="0" name="maas" placeholder="₺"></label>
+      <label>SGK Primi<input type="number" step="0.01" min="0" name="sgk_prim" placeholder="₺"></label>
+      <label>Gelir Vergisi<input type="number" step="0.01" min="0" name="g_vergi" placeholder="₺"></label>
+      <label>Damga Vergisi<input type="number" step="0.01" min="0" name="d_vergi" placeholder="₺"></label>
+      <button type="submit" class="tb-btn act">+ Ekle</button>
+    </form>
+    <div class="oto-form" style="margin-top:10px">
       <label>Dönem<select id="persDonem"><option value="">Tümü</option></select></label>
       <label>Bölüm<select id="persBolum"><option value="">Tümü</option></select></label>
     </div>`);
@@ -1495,10 +1511,44 @@ function renderPersonelPanel(v, sb){
   panelEl.appendChild(listHost);
   v.appendChild(panelEl);
 
-  let allRows=[];
+  let allRows=[]; let editingId=null;
+  const bolumList=panelEl.querySelector('#persBolumList');
   const donemSel=panelEl.querySelector('#persDonem');
   const bolumSel=panelEl.querySelector('#persBolum');
   donemSel.onchange=render; bolumSel.onchange=render;
+
+  function viewRow(r){
+    return `<tr data-id="${r.id}">`+
+      '<td>'+esc(((r.ad||'')+' '+(r.soyad||'')).trim())+'</td>'+
+      '<td>'+esc(r.unvan||'')+'</td>'+
+      '<td>'+esc(r.bolum||'')+'</td>'+
+      '<td>'+esc(r.ise_giris_tarihi||'')+'</td>'+
+      '<td class="num">'+esc(F.tl(+r.maas||0))+'</td>'+
+      '<td class="num">'+esc(F.tl(+r.sgk_prim||0))+'</td>'+
+      '<td class="num">'+esc(F.tl(+r.g_vergi||0))+'</td>'+
+      '<td class="num">'+esc(F.tl(+r.d_vergi||0))+'</td>'+
+      '<td class="num">'+esc(F.tl(persMasraf(r)))+'</td>'+
+      '<td class="num">'+
+      `<button type="button" class="pr-edit tb-btn" data-id="${r.id}" title="Düzenle">✎</button> `+
+      `<button type="button" class="pr-del" data-id="${r.id}" title="Sil">✕</button>`+
+      '</td></tr>';
+  }
+  function editRow(r){
+    return `<tr data-id="${r.id}" class="oto-editrow">`+
+      `<td><input type="text" class="pr-ad" value="${esc(r.ad||'')}" placeholder="Ad" style="width:70px"> <input type="text" class="pr-soyad" value="${esc(r.soyad||'')}" placeholder="Soyad" style="width:70px"></td>`+
+      `<td><input type="text" class="pr-unvan" value="${esc(r.unvan||'')}"></td>`+
+      `<td><input type="text" class="pr-bolum" list="persBolumList" value="${esc(r.bolum||'')}"></td>`+
+      `<td><input type="date" class="pr-ise-giris" value="${esc(r.ise_giris_tarihi||'')}"></td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="pr-maas" value="${r.maas!=null?r.maas:''}"></td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="pr-sgk" value="${r.sgk_prim!=null?r.sgk_prim:''}"></td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="pr-gver" value="${r.g_vergi!=null?r.g_vergi:''}"></td>`+
+      `<td class="num"><input type="number" step="0.01" min="0" class="pr-dver" value="${r.d_vergi!=null?r.d_vergi:''}"></td>`+
+      '<td class="num">'+esc(F.tl(persMasraf(r)))+'</td>'+
+      '<td class="num">'+
+      `<button type="button" class="pr-save tb-btn act" data-id="${r.id}" title="Kaydet">✓</button> `+
+      `<button type="button" class="pr-cancel tb-btn" data-id="${r.id}" title="Vazgeç">✕</button>`+
+      '</td></tr>';
+  }
 
   function render(){
     const donem=donemSel.value, bolum=bolumSel.value;
@@ -1506,38 +1556,80 @@ function renderPersonelPanel(v, sb){
     if(donem) rows=rows.filter(r=>(r.yil+'-'+String(r.ay).padStart(2,'0'))===donem);
     if(bolum) rows=rows.filter(r=>r.bolum===bolum);
     const toplamMaas=sum(rows,r=>+r.maas||0), toplamSgk=sum(rows,r=>+r.sgk_prim||0),
-      toplamVergi=sum(rows,r=>(+r.g_vergi||0)+(+r.d_vergi||0));
+      toplamVergi=sum(rows,r=>(+r.g_vergi||0)+(+r.d_vergi||0)), toplamMasraf=sum(rows,persMasraf);
     kpiHost.innerHTML=kpi('Personel',rows.length)+kpi('Toplam Maaş',F.tl(toplamMaas))+
-      kpi('Toplam SGK Primi',F.tl(toplamSgk))+kpi('Toplam Vergi',F.tl(toplamVergi));
+      kpi('Toplam SGK Primi',F.tl(toplamSgk))+kpi('Toplam Vergi',F.tl(toplamVergi))+
+      kpi('Toplam Personel Masrafı',F.tl(toplamMasraf));
     if(!rows.length){ listHost.innerHTML='<div class="miss">Kayıt yok</div>'; return; }
     const sorted=[...rows].sort((a,b)=>(a.bolum||'').localeCompare(b.bolum||'','tr')||(a.ad||'').localeCompare(b.ad||'','tr'));
     let h='<div class="tbl-scroll"><table class="dt"><thead><tr>'+
-      '<th>Ad Soyad</th><th>Ünvan</th><th>Bölüm</th><th>İşe Giriş</th><th>Maaş</th><th>SGK Primi</th><th>Gelir Vergisi</th><th>Damga Vergisi</th></tr></thead><tbody>';
-    sorted.forEach(r=>{
-      h+='<tr><td>'+esc(((r.ad||'')+' '+(r.soyad||'')).trim())+'</td>'+
-        '<td>'+esc(r.unvan||'')+'</td>'+
-        '<td>'+esc(r.bolum||'')+'</td>'+
-        '<td>'+esc(r.ise_giris_tarihi||'')+'</td>'+
-        '<td class="num">'+esc(F.tl(+r.maas||0))+'</td>'+
-        '<td class="num">'+esc(F.tl(+r.sgk_prim||0))+'</td>'+
-        '<td class="num">'+esc(F.tl(+r.g_vergi||0))+'</td>'+
-        '<td class="num">'+esc(F.tl(+r.d_vergi||0))+'</td></tr>';
-    });
+      '<th>Ad Soyad</th><th>Ünvan</th><th>Bölüm</th><th>İşe Giriş</th><th>Maaş</th><th>SGK Primi</th><th>Gelir Vergisi</th><th>Damga Vergisi</th><th>Personel Masrafı</th><th></th></tr></thead><tbody>';
+    sorted.forEach(r=>{ h+= (String(r.id)===String(editingId)) ? editRow(r) : viewRow(r); });
     h+='</tbody></table></div>';
     listHost.innerHTML=h;
+
+    listHost.querySelectorAll('.pr-del').forEach(b=> b.onclick=async()=>{
+      if(!confirm('Bu personel kaydını silmek istiyor musunuz?')) return;
+      b.disabled=true;
+      const { error }=await sb.from('personel').delete().eq('id',b.dataset.id);
+      if(error){ alert('Silinemedi: '+error.message); b.disabled=false; return; }
+      load();
+    });
+    listHost.querySelectorAll('.pr-edit').forEach(b=> b.onclick=()=>{ editingId=b.dataset.id; render(); });
+    listHost.querySelectorAll('.pr-cancel').forEach(b=> b.onclick=()=>{ editingId=null; render(); });
+    listHost.querySelectorAll('.pr-save').forEach(b=> b.onclick=async()=>{
+      const tr=b.closest('tr');
+      const val=cls=>{ const x=tr.querySelector('.'+cls).value.trim(); return x===''?null:x; };
+      const num=cls=>{ const x=tr.querySelector('.'+cls).value; return x===''?null:Number(x); };
+      const ad=val('pr-ad'), soyad=val('pr-soyad');
+      if(!ad||!soyad){ alert('Ad ve soyad gerekli.'); return; }
+      const row={ ad, soyad, unvan:val('pr-unvan'), bolum:val('pr-bolum'),
+        ise_giris_tarihi:val('pr-ise-giris'),
+        maas:num('pr-maas'), sgk_prim:num('pr-sgk'), g_vergi:num('pr-gver'), d_vergi:num('pr-dver') };
+      b.disabled=true;
+      const { error }=await sb.from('personel').update(row).eq('id', b.dataset.id);
+      if(error){ alert('Kaydedilemedi: '+error.message); b.disabled=false; return; }
+      editingId=null;
+      load();
+    });
   }
 
-  (async function load(){
+  async function load(){
     const { data, error }=await sb.from('personel').select('*');
     if(error){ listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(error.message)+'</div>'; return; }
     allRows=data||[];
     const donemler=[...new Set(allRows.map(r=>r.yil+'-'+String(r.ay).padStart(2,'0')))].sort();
+    const keepDonem=donemSel.value;
     donemSel.innerHTML='<option value="">Tümü</option>'+donemler.map(d=>`<option value="${d}">${esc(F.mon(d))}</option>`).join('');
+    if(donemler.includes(keepDonem)) donemSel.value=keepDonem; else if(donemler.length===1) donemSel.value=donemler[0];
     const bolumler=[...new Set(allRows.map(r=>r.bolum).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+    const keepBolum=bolumSel.value;
     bolumSel.innerHTML='<option value="">Tümü</option>'+bolumler.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('');
-    if(donemler.length===1) donemSel.value=donemler[0];
+    if(bolumler.includes(keepBolum)) bolumSel.value=keepBolum;
+    bolumList.innerHTML=bolumler.map(b=>`<option value="${esc(b)}">`).join('');
     render();
-  })();
+  }
+
+  panelEl.querySelector('#personelForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const f=e.target;
+    const val=n=>{ const x=f.elements[n].value; return x===''?null:x; };
+    const num=n=>{ const x=f.elements[n].value; return x===''?null:Number(x); };
+    const ad=val('ad'), soyad=val('soyad'), yil=num('yil'), ay=num('ay');
+    if(!ad||!soyad){ alert('Ad ve soyad gerekli.'); return; }
+    if(!yil||!ay){ alert('Yıl ve ay gerekli.'); return; }
+    const row={ yil, ay, ad, soyad, unvan:val('unvan'), bolum:val('bolum'),
+      ise_giris_tarihi:val('ise_giris_tarihi'),
+      maas:num('maas'), sgk_prim:num('sgk_prim'), g_vergi:num('g_vergi'), d_vergi:num('d_vergi') };
+    const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
+    const { error }=await sb.from('personel').insert(row);
+    btn.disabled=false;
+    if(error){ alert('Eklenemedi: '+error.message); return; }
+    f.reset();
+    load();
+  });
+
+  load();
 }
 
 RENDERERS.personel=(v)=>{
