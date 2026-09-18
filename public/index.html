@@ -315,6 +315,12 @@ input.fin-oto:focus,input.fin-pers:focus,input.fin-gider:focus{outline:none; bor
 .chip-btn:hover{border-color:#22c55e; color:#22c55e}
 .chip-btn.on{background:#22c55e; border-color:#22c55e; color:#fff}
 #aracList table.dt td:has(.chip-group){text-align:left}
+/* Araçlar tablosu satırlarını mümkün olduğunca daralt (dikey boşluk azalt) */
+#aracList table.dt th,#aracList table.dt td{padding:4px 8px}
+/* Düzenle (✎) ikonu belirgin yeşil olsun */
+button.oto-edit{border:1px solid color-mix(in srgb,#22c55e 50%, transparent); background:color-mix(in srgb,#22c55e 16%, var(--surface));
+  color:#22c55e; border-radius:6px; padding:2px 8px; font-size:12px; cursor:pointer}
+button.oto-edit:hover{background:#22c55e; border-color:#22c55e; color:#fff}
 th.oto-vurgu,td.oto-vurgu{color:#f97316; font-weight:700}
 th.oto-vurgu{background:color-mix(in srgb, #f97316 16%, transparent)}
 button.oto-del{border:1px solid var(--hair-strong); background:var(--surface); color:var(--muted);
