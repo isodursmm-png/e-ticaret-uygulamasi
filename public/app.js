@@ -1983,6 +1983,10 @@ RENDERERS.matris=(v)=>{
 
 RENDERERS.veri=(v)=>{
   const O=fO();
+  v.appendChild(kpirow(
+    kpi('Ciro Toplamı',F.tl(sum(O,o=>o.ciro||0)),'geçerli filtreye göre')+
+    kpi('Kayıt',F.n(O.length))
+  ));
   const listPanel=panel('Filtrelenmiş siparişler', O.length+' kayıt · başlığa tıklayarak sırala', null);
   const dd=(key,label,opts,set,size)=>
     `<div class="fg" style="min-width:170px;flex:1"><label>${esc(label)}</label>`+
