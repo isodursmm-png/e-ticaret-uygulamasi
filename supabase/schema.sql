@@ -284,3 +284,38 @@ create policy "authenticated_all"
   to authenticated
   using (true)
   with check (true);
+
+-- ============================================================================
+--  PERSONEL  —  bordro listesi (dönem × çalışan)
+--  ----------------------------------------------------------------------------
+--  "E-Ticaret Otoları" grubu altındaki "Personel" sayfasında salt okunur
+--  gösterilir. Kayıtlar elle/Supabase üzerinden girilir (uygulamadan
+--  ekleme/düzenleme YOK); tarayıcı yalnızca okur (anon anahtar + oturum).
+-- ============================================================================
+create table if not exists public.personel (
+  id                 bigint generated always as identity primary key,
+  created_at         timestamptz not null default now(),
+  yil                bigint,
+  ay                 bigint,
+  ad                 text,
+  soyad              text,
+  unvan              text,
+  bolum              text,
+  ise_giris_tarihi   date,
+  maas               numeric,
+  sgk_prim           numeric,
+  g_vergi            numeric,
+  d_vergi            numeric
+);
+
+create index if not exists personel_yil_ay_idx on public.personel (yil, ay);
+create index if not exists personel_bolum_idx on public.personel (bolum);
+
+alter table public.personel enable row level security;
+
+drop policy if exists "read_authenticated" on public.personel;
+create policy "read_authenticated"
+  on public.personel
+  for select
+  to authenticated
+  using (true);

@@ -872,7 +872,7 @@ function turkeyMapSVG(rows){
 const SECTIONS=[
   {grp:'ÖZET', items:[['genel','Genel Bakış','▨']]},
   {grp:'FİNAL', items:[['final','Final — Kâr / Zarar','◈']]},
-  {grp:'E-TİCARET OTOLARI', items:[['otolar','E-Ticaret Otoları','🚚']]},
+  {grp:'E-TİCARET OTOLARI', items:[['otolar','E-Ticaret Otoları','🚚'],['personel','Personel','🧑']]},
   {grp:'SATIŞ', items:[['ciro','Ciro & Kümülatif','₺'],['siparis','Sipariş & Adet','#']]},
   {grp:'OPERASYON', items:[['teslimat','Teslimatlar','⇲'],['zaman','Sipariş & Teslim Saati','◔']]},
   {grp:'MÜŞTERİ', items:[['musteri','Müşteri / CRM','☺']]},
@@ -1480,6 +1480,71 @@ RENDERERS.otolar=(v)=>{
   if(!sb){ const m=document.createElement('div'); m.className='miss'; m.textContent='Supabase bağlantısı yok.'; v.appendChild(m); return; }
 
   renderAraclarPanel(v, sb);
+};
+
+/* ---- Personel: bordro listesi (ad, soyad, unvan, bölüm, maaş, sgk, vergiler) — public.personel (salt okunur) ---- */
+function renderPersonelPanel(v, sb){
+  const panelEl=panel('Personel','E-Ticaret personel bordro listesi — ünvan, bölüm, maaş, SGK primi, vergiler');
+  panelEl.insertAdjacentHTML('beforeend', `
+    <div class="oto-form">
+      <label>Dönem<select id="persDonem"><option value="">Tümü</option></select></label>
+      <label>Bölüm<select id="persBolum"><option value="">Tümü</option></select></label>
+    </div>`);
+  const kpiHost=kpirow(''); panelEl.appendChild(kpiHost);
+  const listHost=document.createElement('div'); listHost.id='persList'; listHost.textContent='Yükleniyor…';
+  panelEl.appendChild(listHost);
+  v.appendChild(panelEl);
+
+  let allRows=[];
+  const donemSel=panelEl.querySelector('#persDonem');
+  const bolumSel=panelEl.querySelector('#persBolum');
+  donemSel.onchange=render; bolumSel.onchange=render;
+
+  function render(){
+    const donem=donemSel.value, bolum=bolumSel.value;
+    let rows=allRows;
+    if(donem) rows=rows.filter(r=>(r.yil+'-'+String(r.ay).padStart(2,'0'))===donem);
+    if(bolum) rows=rows.filter(r=>r.bolum===bolum);
+    const toplamMaas=sum(rows,r=>+r.maas||0), toplamSgk=sum(rows,r=>+r.sgk_prim||0),
+      toplamVergi=sum(rows,r=>(+r.g_vergi||0)+(+r.d_vergi||0));
+    kpiHost.innerHTML=kpi('Personel',rows.length)+kpi('Toplam Maaş',F.tl(toplamMaas))+
+      kpi('Toplam SGK Primi',F.tl(toplamSgk))+kpi('Toplam Vergi',F.tl(toplamVergi));
+    if(!rows.length){ listHost.innerHTML='<div class="miss">Kayıt yok</div>'; return; }
+    const sorted=[...rows].sort((a,b)=>(a.bolum||'').localeCompare(b.bolum||'','tr')||(a.ad||'').localeCompare(b.ad||'','tr'));
+    let h='<div class="tbl-scroll"><table class="dt"><thead><tr>'+
+      '<th>Ad Soyad</th><th>Ünvan</th><th>Bölüm</th><th>İşe Giriş</th><th>Maaş</th><th>SGK Primi</th><th>Gelir Vergisi</th><th>Damga Vergisi</th></tr></thead><tbody>';
+    sorted.forEach(r=>{
+      h+='<tr><td>'+esc(((r.ad||'')+' '+(r.soyad||'')).trim())+'</td>'+
+        '<td>'+esc(r.unvan||'')+'</td>'+
+        '<td>'+esc(r.bolum||'')+'</td>'+
+        '<td>'+esc(r.ise_giris_tarihi||'')+'</td>'+
+        '<td class="num">'+esc(F.tl(+r.maas||0))+'</td>'+
+        '<td class="num">'+esc(F.tl(+r.sgk_prim||0))+'</td>'+
+        '<td class="num">'+esc(F.tl(+r.g_vergi||0))+'</td>'+
+        '<td class="num">'+esc(F.tl(+r.d_vergi||0))+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+    listHost.innerHTML=h;
+  }
+
+  (async function load(){
+    const { data, error }=await sb.from('personel').select('*');
+    if(error){ listHost.innerHTML='<div class="miss">Yüklenemedi: '+esc(error.message)+'</div>'; return; }
+    allRows=data||[];
+    const donemler=[...new Set(allRows.map(r=>r.yil+'-'+String(r.ay).padStart(2,'0')))].sort();
+    donemSel.innerHTML='<option value="">Tümü</option>'+donemler.map(d=>`<option value="${d}">${esc(F.mon(d))}</option>`).join('');
+    const bolumler=[...new Set(allRows.map(r=>r.bolum).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+    bolumSel.innerHTML='<option value="">Tümü</option>'+bolumler.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('');
+    if(donemler.length===1) donemSel.value=donemler[0];
+    render();
+  })();
+}
+
+RENDERERS.personel=(v)=>{
+  const sb=window.__SB__;
+  if(!sb){ const m=document.createElement('div'); m.className='miss'; m.textContent='Supabase bağlantısı yok.'; v.appendChild(m); return; }
+
+  renderPersonelPanel(v, sb);
 };
 
 RENDERERS.ciro=(v)=>{
