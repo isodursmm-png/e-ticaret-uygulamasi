@@ -1,0 +1,40 @@
+name: ticimax-sync
+
+# public.ticimax (Ticimax API'den TAM ham sipariş arşivi) tablosunu günde bir
+# kez günceller — collect.yml'deki canlı pano akışından (raw_orders/
+# analytics_payload) TAMAMEN AYRI ve BAĞIMSIZ. Yalnız son birkaç günü tek
+# istekte çeker (scripts/ticimax-tablo-sync.js), bu yüzden collect.yml'in
+# 3 saatlik döngüsünden çok daha hafiftir — Actions dakika kotasını
+# gözle görülür şekilde etkilemez.
+on:
+  schedule:
+    - cron: '15 3 * * *'         # her gün 03:15 UTC (~06:15 TR)
+  workflow_dispatch: {}          # elle "Run workflow"
+
+concurrency:
+  group: ticimax-sync
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: ticimax tablo senkronizasyonu
+        run: node scripts/ticimax-tablo-sync.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
+          TICIMAX_API_URL: ${{ vars.TICIMAX_API_URL }}
+          TICIMAX_CODE: ${{ secrets.TICIMAX_CODE }}
+          TICIMAX_TIMEOUT_MS: ${{ vars.TICIMAX_TIMEOUT_MS }}
+          TICIMAX_SYNC_DAYS: ${{ vars.TICIMAX_SYNC_DAYS || '4' }}

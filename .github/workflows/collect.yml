@@ -17,7 +17,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 60          # Ticimax tüm geçmişi ay ay tarar (FETCH_DAYS=0)
+    timeout-minutes: 60          # raw_orders + public.ticimax tüm geçmişi sayfalayarak okur
     steps:
       - uses: actions/checkout@v4
 
@@ -55,12 +55,8 @@ jobs:
           EVDS_API_KEY: ${{ secrets.EVDS_API_KEY }}
           EVDS_TUFE_SERIES: ${{ vars.EVDS_TUFE_SERIES }}
 
-          TICIMAX_API_URL: ${{ vars.TICIMAX_API_URL }}
-          TICIMAX_CODE: ${{ secrets.TICIMAX_CODE }}
-          TICIMAX_TIMEOUT_MS: ${{ vars.TICIMAX_TIMEOUT_MS }}
-          # Pano artık raw_orders'ın TAMAMINDAN kuruluyor; canlı çekim yalnız
-          # arşivi güncel tutar → küçük pencere yeter (yeni + son değişen siparişler).
-          TICIMAX_FETCH_DAYS: ${{ vars.TICIMAX_FETCH_DAYS || '30' }}
+          # NOT: TICIMAX_* burada YOK — Ticimax artık bu iş akışının dışında,
+          # ayrı bir günlük iş ile senkronize ediliyor (bkz. ticimax-sync.yml).
 
           TRENDYOL_SELLER_ID: ${{ secrets.TRENDYOL_SELLER_ID }}
           TRENDYOL_API_KEY: ${{ secrets.TRENDYOL_API_KEY }}

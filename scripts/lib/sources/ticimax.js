@@ -295,4 +295,4 @@ async function fetch(opts) {
   return rows;
 }
 
-module.exports = { id, configured, fetch, fetchRows };
+module.exports = { id, configured, fetch, fetchRows, toRowsInto };

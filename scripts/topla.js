@@ -20,6 +20,13 @@
    (ham satış arşivi, birikir) güncellenir. raw_orders için supabase/schema.sql
    çalıştırılmış olmalı.
 
+   TİCİMAX: SOURCES listesinde YOK — Ticimax artık ayrı bir arşive
+   (public.ticimax, ham SOAP nesnesi) gidiyor, kendi günlük işi ile
+   (ticimax-tablo-sync.js / .github/workflows/ticimax-sync.yml) senkronize
+   ediliyor. fetchMergedFromRaw (lib/from-raw.js) panoyu kurarken o tabloyu
+   ayrıca okuyup t0/t1'e çeviriyor — burada tekrar çekmeye gerek yok (aksi
+   halde raw_orders'a yeniden Ticimax satırı yazılırdı).
+
    Env: bkz. .env.example  (SUPABASE_URL, SUPABASE_SERVICE_ROLE + kaynak env'leri)
    ========================================================================== */
 'use strict';
@@ -33,7 +40,6 @@ const { toRawRows, pushRaw } = require('./lib/raw-store');
 const { publishFromRaw, publishTufe } = require('./lib/publish-payload');
 
 const SOURCES = [
-  require('./lib/sources/ticimax'),
   require('./lib/sources/trendyol'),
   require('./lib/sources/tgo-api'),
   require('./lib/sources/yemeksepeti-api'),

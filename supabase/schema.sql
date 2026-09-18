@@ -290,6 +290,37 @@ create policy "authenticated_all"
   with check (true);
 
 -- ============================================================================
+--  TİCİMAX  —  API'den gelen HAM sipariş arşivi (2025-01-01 → bugün)
+--  ----------------------------------------------------------------------------
+--  raw_orders.data yalnızca panoya giden indirgenmiş alanları tutuyor; bu
+--  tablo Ticimax SOAP API'sinin döndürdüğü TAM nesneyi (adres, ödeme, ürün
+--  kalemleri, KDV detayları — hiçbir alan atılmadan) saklar. Panoyu/analytics_
+--  payload'ı ETKİLEMEZ, tamamen ayrı bir arşiv. Doldurma:
+--  scripts/ticimax-tablo-doldur.js. Yazma yalnızca service_role ile.
+-- ============================================================================
+create table if not exists public.ticimax (
+  siparis_no  text        primary key,
+  siparis_id  bigint,
+  order_date  timestamptz,
+  durum       text,
+  data        jsonb       not null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists ticimax_order_date_idx on public.ticimax (order_date);
+create index if not exists ticimax_durum_idx on public.ticimax (durum);
+
+alter table public.ticimax enable row level security;
+
+drop policy if exists "read_authenticated" on public.ticimax;
+create policy "read_authenticated"
+  on public.ticimax
+  for select
+  to authenticated
+  using (true);
+
+-- ============================================================================
 --  PERSONEL  —  bordro listesi (dönem × çalışan)
 --  ----------------------------------------------------------------------------
 --  "E-Ticaret Otoları" grubu altındaki "Personel" sayfasında listelenir,
