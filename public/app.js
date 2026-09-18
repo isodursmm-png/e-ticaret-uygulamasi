@@ -1343,7 +1343,6 @@ function renderAraclarPanel(v, sb){
       <label>Şube<input type="text" name="sube" list="aracSubeList" placeholder="Erciyes" autocomplete="off"></label>
       <datalist id="aracSubeList">${DIMS.store.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
       <label>Şoför<input type="text" name="sofor" placeholder="Ad Soyad"></label>
-      <label>Kullanım<input type="text" name="kullanim" placeholder="Dağıtım / Servis / ..."></label>
       <label>Araç Kaynağı<input type="text" name="arac_kaynak" placeholder="Kiralık / Şirket / ..."></label>
       <label>Personel Kaynağı<input type="text" name="pers_kaynak" placeholder="Şirket / Taşeron / ..."></label>
       <label>Maaş<input type="number" step="0.01" min="0" name="maas" placeholder="₺"></label>
@@ -1366,7 +1365,6 @@ function renderAraclarPanel(v, sb){
   function viewRow(r){
     return `<tr data-id="${r.id}">`+
       `<td>${esc(r.plaka||'')}</td><td>${esc(r.sube||'')}</td><td>${esc(r.sofor||'')}</td>`+
-      `<td>${esc(r.kullanim||'')}</td>`+
       `<td>${esc(r.arac_kaynak||'')}</td><td>${esc(r.pers_kaynak||'')}</td>`+
       `<td class="num">${r.maas!=null?esc(F.tl(r.maas)):'—'}</td>`+
       `<td class="num">${esc(F.tl(r.yakit||0))}</td>`+
@@ -1380,7 +1378,6 @@ function renderAraclarPanel(v, sb){
       `<td><input type="text" class="ar-plaka" value="${esc(r.plaka||'')}" style="text-transform:uppercase"></td>`+
       `<td><input type="text" class="ar-sube" list="aracSubeList" value="${esc(r.sube||'')}"></td>`+
       `<td><input type="text" class="ar-sofor" value="${esc(r.sofor||'')}"></td>`+
-      `<td><input type="text" class="ar-kullanim" value="${esc(r.kullanim||'')}"></td>`+
       `<td><input type="text" class="ar-arac-kaynak" value="${esc(r.arac_kaynak||'')}"></td>`+
       `<td><input type="text" class="ar-pers-kaynak" value="${esc(r.pers_kaynak||'')}"></td>`+
       `<td class="num"><input type="number" step="0.01" min="0" class="ar-maas" value="${r.maas!=null?r.maas:''}"></td>`+
@@ -1394,7 +1391,7 @@ function renderAraclarPanel(v, sb){
     if(!rows.length){ listHost.innerHTML='<div class="miss">Henüz araç kaydı yok</div>'; return; }
     const yakitTh=yakitAy?`Yakıt Tutarı (${esc(F.mon(yakitAy))})`:'Yakıt Tutarı (Tümü)';
     let h=`<div class="tbl-scroll"><table class="dt"><thead><tr>`+
-      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Kullanım</th><th>Araç Kaynağı</th><th>Personel Kaynağı</th><th>Maaş</th><th>${yakitTh}</th><th></th></tr></thead><tbody>`;
+      `<th>Plaka</th><th>Şube</th><th>Şoför</th><th>Araç Kaynağı</th><th>Personel Kaynağı</th><th>Maaş</th><th>${yakitTh}</th><th></th></tr></thead><tbody>`;
     rows.forEach(r=>{ h+= (String(r.id)===String(editingId)) ? editRow(r) : viewRow(r); });
     h+='</tbody></table></div>';
     listHost.innerHTML=h;
@@ -1414,7 +1411,7 @@ function renderAraclarPanel(v, sb){
       const plaka=String(val('ar-plaka')||'').toUpperCase();
       if(!plaka){ alert('Plaka gerekli.'); return; }
       const maasRaw=tr.querySelector('.ar-maas').value;
-      const row={ plaka, sube:val('ar-sube'), sofor:val('ar-sofor'), kullanim:val('ar-kullanim'),
+      const row={ plaka, sube:val('ar-sube'), sofor:val('ar-sofor'),
         arac_kaynak:val('ar-arac-kaynak'), pers_kaynak:val('ar-pers-kaynak'),
         maas: maasRaw===''?null:Number(maasRaw) };
       b.disabled=true;
@@ -1446,7 +1443,7 @@ function renderAraclarPanel(v, sb){
     const plaka=String(val('plaka')||'').trim().toUpperCase();
     if(!plaka){ alert('Plaka gerekli.'); return; }
     const maasRaw=f.elements.maas.value;
-    const row={ plaka, sube:val('sube'), sofor:val('sofor'), kullanim:val('kullanim'),
+    const row={ plaka, sube:val('sube'), sofor:val('sofor'),
       arac_kaynak:val('arac_kaynak'), pers_kaynak:val('pers_kaynak'),
       maas: maasRaw===''?null:Number(maasRaw) };
     const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
