@@ -1998,7 +1998,15 @@ RENDERERS.veri=(v)=>{
     dd('ch','Kanal',CH,S.ch,3)+
     dd('st','Durum',DIMS.st,S.st,4)+
     dd('store','Mağaza',DIMS.store,S.store,5)+
+    `<div class="fg" style="min-width:220px;flex:2"><label>Ara (müşteri / adres / no)</label>`+
+    `<input type="text" id="veriQ" value="${esc(S.q)}" placeholder="ör. Muratpaşa"></div>`+
     `</div>`);
+  let veriQt;
+  listPanel.querySelector('#veriQ').oninput=(e)=>{
+    clearTimeout(veriQt);
+    const val=e.target.value;
+    veriQt=setTimeout(()=>{ S.q=val.trim(); buildFilters(); render(); },260);
+  };
   listPanel.querySelectorAll('select[data-key]').forEach(sel=>sel.addEventListener('change',()=>{
     const key=sel.dataset.key;
     S[key].clear();
